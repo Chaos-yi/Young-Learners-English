@@ -556,6 +556,21 @@ details summary { cursor: pointer; font-weight: 800; color: var(--muted); }
 .word-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .word-chip { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 2px solid var(--line); background: var(--surface); font-family: var(--font-learn); font-weight: 700; font-size: 1.05rem; }
 
+/* 设备检查：状态同时用符号和颜色表示 */
+.checks { display: grid; }
+.check { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 14px; padding: 16px 0; border-top: 1px solid var(--line); }
+.check:first-child { border-top: 0; padding-top: 4px; }
+.check-state {
+  width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center;
+  font-weight: 800; background: var(--surface-2); color: var(--muted);
+}
+.check-state[data-state="ok"] { background: var(--leaf); color: var(--on-accent); }
+.check-state[data-state="warn"] { background: var(--sun); color: var(--on-sun); }
+.check-state[data-state="info"] { background: var(--sky-soft); color: var(--sky); }
+.check-main { display: grid; gap: 6px; min-width: 0; }
+.check-main h3 { font-size: 1.05rem; }
+.check-act:empty { display: none; }
+
 .form { display: grid; gap: 18px; }
 .field { display: grid; gap: 8px; }
 .field > label, .field > .label { font-weight: 800; }

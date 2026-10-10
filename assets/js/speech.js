@@ -210,13 +210,32 @@
     return best >= 0.8 ? 3 : best >= 0.5 ? 2 : 1;
   }
 
+  /*
+   * 等发音人列表加载完（安卓/鸿蒙浏览器上常常要等一会儿，有的不触发 voiceschanged），
+   * 返回 { supported, count: 英语发音人数量, total: 全部发音人数量, voice: 将要使用的发音人 }
+   */
+  function voiceStatus(timeout) {
+    return new Promise(resolve => {
+      if (!synth) { resolve({ supported: false, count: 0, total: 0, voice: null }); return; }
+      const start = Date.now();
+      (function check() {
+        loadVoices();
+        if (voices.length || Date.now() - start > (timeout || 2500)) {
+          resolve({ supported: true, count: voices.length, total: synth.getVoices().length, voice: pickVoice() });
+        } else {
+          setTimeout(check, 200);
+        }
+      })();
+    });
+  }
+
   function praise(stars) {
     const list = LE.DATA.praise[stars] || LE.DATA.praise[1];
     return list[Math.floor(Math.random() * list.length)];
   }
 
   LE.speech = {
-    speak, stop, capture, score, praise, tokens,
+    speak, stop, capture, score, praise, tokens, voiceStatus,
     get supported() { return !!synth; },
     get canRecord() { return canRecord; },
     get canRecognize() { return !!Recognition; },

@@ -692,6 +692,15 @@
         <div class="section-head"><h2>本周打卡</h2><p>绿色 = 完成路线，黄色 = 学了 5 分钟以上</p></div>
         <div class="week">${weekHTML()}</div>
       </section>`;
+
+    // 没有英语发音人时提醒家长（发音人列表在安卓/鸿蒙上加载较慢，稍后再查）
+    if (SP.supported) {
+      const hero = $('.hero', view);
+      SP.voiceStatus(2500).then(st => {
+        if (st.count || !hero.isConnected) return;
+        hero.insertAdjacentHTML('beforebegin', '<div class="notice"><span>这台设备没有找到英语发音，点读可能没有声音或带中文口音。请家长到 <a href="#/parent">家长中心 → 设备检查</a> 看一看。</span></div>');
+      });
+    }
   }
 
   function viewStep(stepId) {
@@ -1031,7 +1040,7 @@
     const tab = (id, label) => `<button class="filter" type="button" data-t="${id}" aria-pressed="${parentTab === id}">${label}</button>`;
     view.innerHTML = `
       <div class="page-title"><h1>家长中心</h1><span class="sub">孩子的学习情况和设置</span></div>
-      <div class="parent-tabs filters">${tab('report', '学习报告')}${tab('settings', '学习设置')}${tab('videos', '视频管理')}</div>
+      <div class="parent-tabs filters">${tab('report', '学习报告')}${tab('settings', '学习设置')}${tab('videos', '视频管理')}${tab('device', '设备检查')}</div>
       <div id="parentBody" class="grid"></div>`;
     $('.parent-tabs', view).onclick = e => {
       const b = e.target.closest('[data-t]');
@@ -1040,7 +1049,115 @@
     const body = $('#parentBody');
     if (parentTab === 'report') parentReport(body);
     else if (parentTab === 'settings') parentSettings(body);
+    else if (parentTab === 'device') parentDevice(body);
     else parentVideos(body);
+  }
+
+  /* 设备检查：第一次在平板上打开时，确认发音、话筒、离线缓存、进度保存都正常 */
+  function parentDevice(body) {
+    const row = (id, title) => `
+      <div class="check" id="${id}">
+        <span class="check-state" data-state="wait">…</span>
+        <div class="check-main"><h3>${title}</h3><p class="check-text muted">检查中…</p><div class="row check-act"></div></div>
+      </div>`;
+    body.innerHTML = `
+      <section class="card grid">
+        <div class="section-head"><h2>设备检查</h2><p>第一次在平板上打开时，按顺序检查一遍</p></div>
+        <div class="checks">
+          ${row('ckVoice', '英语发音')}
+          ${row('ckMic', '话筒（跟读录音）')}
+          ${row('ckAsr', '自动打星（语音识别）')}
+          ${row('ckOffline', '离线使用')}
+          ${row('ckSave', '保存学习进度')}
+          ${row('ckApp', '桌面图标')}
+        </div>
+      </section>`;
+    const STATE = { ok: '✓', warn: '!', info: 'i', wait: '…' };
+    function set(id, state, text, actions) {
+      const el = $('#' + id, body);
+      if (!el) return;
+      const s = $('.check-state', el);
+      s.dataset.state = state;
+      s.textContent = STATE[state];
+      $('.check-text', el).textContent = text;
+      $('.check-act', el).innerHTML = actions || '';
+    }
+
+    SP.voiceStatus(3000).then(st => {
+      if (!st.supported) {
+        set('ckVoice', 'warn', '这个浏览器不支持朗读。请换用平板自带的浏览器（华为浏览器）打开。');
+      } else if (!st.count) {
+        set('ckVoice', 'warn', `没有找到英语发音人（本机共有 ${st.total} 个发音人）。孩子点读时可能没声音，或用中文口音读英文。可以到平板「设置 → 辅助功能」里找「文字转语音输出」，选择或下载英语语音后再回来试听。`,
+          `<button class="btn btn-soft" type="button" data-ck="voice">${icon('speaker')} 试听</button>`);
+      } else {
+        set('ckVoice', 'ok', `找到 ${st.count} 个英语发音人，正在使用：${st.voice ? st.voice.name + '（' + st.voice.lang + '）' : '系统默认'}。点「试听」，听听是不是标准、清楚的英语。不满意可以到「学习设置」换发音人。`,
+          `<button class="btn btn-soft" type="button" data-ck="voice">${icon('speaker')} 试听</button>`);
+      }
+    });
+
+    if (!window.isSecureContext) {
+      set('ckMic', 'warn', '当前地址不是 https，浏览器不允许用话筒。请用 https 开头的网址打开（比如 GitHub Pages 地址）。');
+    } else if (!SP.canRecord) {
+      set('ckMic', 'info', '这个浏览器不能录音。跟读时孩子大声说出来，由家长打星，不影响使用。');
+    } else {
+      set('ckMic', 'info', '点下面的按钮，对着平板说一句话（3 秒），听听能不能录上。第一次会弹出「允许使用麦克风」，请点允许。',
+        `<button class="btn btn-soft" type="button" data-ck="mic">${icon('mic')} 测试录音</button>`);
+    }
+
+    set('ckAsr', 'info', SP.canRecognize
+      ? '浏览器有语音识别功能，但在国内常常连不上识别服务。录音测试或跟读时如果自动给了星，就说明能用；否则会由家长打星，不影响使用。'
+      : '这个浏览器没有语音识别，跟读时由家长听完打星，不影响使用。');
+
+    if (!('serviceWorker' in navigator) || !window.isSecureContext) {
+      set('ckOffline', 'warn', '当前打开方式不支持离线缓存。用 https 网址打开后，断网也能用。');
+    } else {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg && reg.active) set('ckOffline', 'ok', '网站已经存到这台平板上，断网或网络慢时也能直接打开。');
+        else set('ckOffline', 'info', '正在把网站存到平板上，稍等几秒后刷新页面再看。');
+      }).catch(() => set('ckOffline', 'warn', '离线缓存没开启成功，联网时仍可正常使用。'));
+    }
+
+    let canSave = false;
+    try {
+      localStorage.setItem('little-ears.check', '1');
+      canSave = localStorage.getItem('little-ears.check') === '1';
+      localStorage.removeItem('little-ears.check');
+    } catch (e) { canSave = false; }
+    set('ckSave', canSave ? 'ok' : 'warn', canSave
+      ? '进度保存在这台平板的浏览器里。不要在浏览器设置里「清除数据/缓存」，也不要用无痕模式，否则星星和单词记录会丢失。'
+      : '无法保存进度（可能开了无痕模式或禁止了网站存储）。请用普通模式打开。');
+
+    const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+    set('ckApp', standalone ? 'ok' : 'info', standalone
+      ? '已经是从桌面图标打开的，没有浏览器地址栏，孩子不容易误点到别的网站。'
+      : '建议在浏览器菜单里选「添加到桌面」（或「安装应用」），孩子以后点桌面上的小耳朵图标就能进入。');
+
+    body.onclick = e => {
+      const b = e.target.closest('[data-ck]');
+      if (!b) return;
+      if (b.dataset.ck === 'voice') {
+        interrupt();
+        SP.speak("Hello! I'm your English friend. Apple, banana, orange. Good job!");
+      } else if (b.dataset.ck === 'mic') {
+        b.disabled = true;
+        set('ckMic', 'wait', '正在录音，请说一句话……');
+        const ctrl = SP.capture({ maxMs: 3000 });
+        onCleanup(() => ctrl.stop());
+        ctrl.done.then(r => {
+          if (r.url) {
+            set('ckMic', 'ok', '录音正常，正在回放刚才的声音。' + (SP.score('hello', r.transcripts) ? '（语音识别也能用）' : ''),
+              `<button class="btn btn-soft" type="button" data-ck="mic">${icon('again')} 再测一次</button>`);
+            new Audio(r.url).play().catch(() => {});
+          } else if (r.error === 'denied') {
+            set('ckMic', 'warn', '话筒权限被拒绝。请在浏览器的网站设置里允许麦克风；如果还不行，到平板「设置 → 应用和服务 → 权限管理」里允许浏览器使用麦克风。',
+              `<button class="btn btn-soft" type="button" data-ck="mic">${icon('again')} 再测一次</button>`);
+          } else {
+            set('ckMic', 'warn', '没有录到声音。请检查话筒权限后再试；实在不行，跟读时由家长打星。',
+              `<button class="btn btn-soft" type="button" data-ck="mic">${icon('again')} 再测一次</button>`);
+          }
+        });
+      }
+    };
   }
 
   function parentGate() {
@@ -1373,4 +1490,9 @@
   }
   window.addEventListener('hashchange', route);
   route();
+
+  // 离线缓存：只在 https 或 localhost 下可用
+  if ('serviceWorker' in navigator && window.isSecureContext && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
 })();

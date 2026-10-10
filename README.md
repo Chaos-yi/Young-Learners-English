@@ -4,7 +4,9 @@
 内容与剑桥 Power Up（Pre A1 Starters 难度）主题同步，孩子不识字也能用：图片 + 声音 + 大按钮。
 
 - 搭建思路（目标、学习路线、功能模块、内容规划、技术方案、迭代路线）：[`docs/plan.md`](docs/plan.md)
+- **部署到华为学习平板**（一步步操作）：[`docs/deploy-huawei.md`](docs/deploy-huawei.md)
 - 可运行原型：本仓库根目录的 `index.html`（纯静态，无需安装任何依赖）
+- 开通 GitHub Pages 后的网址：<https://chaos-yi.github.io/Young-Learners-English/>
 
 ## 原型里有什么
 
@@ -30,19 +32,24 @@ python3 -m http.server 8000
 
 > 直接双击 `index.html` 也能用，但浏览器只允许在 `http://localhost` 或 `https://` 下使用话筒，所以跟读录音需要用上面的方式打开。
 
-**给孩子在 iPad / 手机上用：** 部署成网站后用 Safari 打开，再点「分享 → 添加到主屏幕」。
+**给孩子在平板 / 手机上用：** 部署成 https 网站，用平板浏览器打开一次并刷新，再「添加到桌面」。
 
-- GitHub Pages：仓库 Settings → Pages → Source 选 `Deploy from a branch`，分支选放网站代码的分支（如 `main`）、目录 `/ (root)`，保存后几分钟就有 `https://<用户名>.github.io/<仓库名>/` 的地址。
-- 国内访问慢的话，可以把整个目录上传到阿里云 OSS / 腾讯云 COS 的静态网站托管。
+- GitHub Pages：仓库 Settings → Pages → Source 选 `Deploy from a branch`，分支选 `claude/epic-gates-w5p8og`、目录 `/ (root)`，保存后几分钟就能通过上面的网址访问。
+- 华为学习平板的完整步骤（含学习模式管控、话筒权限、发音检查）：[`docs/deploy-huawei.md`](docs/deploy-huawei.md)
+- iPad：用 Safari 打开，点「分享 → 添加到主屏幕」。
+- 网站会自动缓存到设备上（Service Worker），第一次打开后断网也能用；字体已放在本地，不依赖国内访问不了的 Google Fonts。
+- 国内访问 `github.io` 太慢的话，可以把整个目录上传到腾讯云 / 阿里云的静态网站托管（需要自己的域名并备案）。
+
+**第一次在新设备上用：** 进「家长中心 → 设备检查」，确认英语发音、话筒、离线缓存、进度保存都正常。
 
 ## 浏览器支持
 
-| 功能 | iPad / iPhone Safari | 电脑 Chrome / Edge |
-|---|---|---|
-| 英语朗读 | ✅ 系统自带发音人（推荐 Daniel 英音） | ✅ |
-| 跟读录音 + 回放 | ✅ | ✅ |
-| 自动打星（语音识别） | ✅ iOS 14.5+ | Edge ✅；Chrome 需要访问 Google 服务，国内一般用不了 |
-| 识别不可用时 | 自动改成「家长打星」，不影响使用 | 同左 |
+| 功能 | 华为平板（华为浏览器） | iPad / iPhone Safari | 电脑 Chrome / Edge |
+|---|---|---|---|
+| 英语朗读 | ⚠️ 取决于系统语音引擎，用「设备检查」试听确认 | ✅ 系统自带发音人（推荐 Daniel 英音） | ✅ |
+| 跟读录音 + 回放 | ✅（需允许麦克风） | ✅ | ✅ |
+| 自动打星（语音识别） | 一般不可用 → 家长打星 | ✅ iOS 14.5+ | Edge ✅；Chrome 需要访问 Google 服务，国内一般用不了 |
+| 离线使用 / 添加到桌面 | ✅ | ✅ | ✅ |
 
 学习进度保存在当前浏览器里（`localStorage`），换设备或清除浏览器数据会丢失；云同步放在正式版。
 
@@ -50,13 +57,20 @@ python3 -m http.server 8000
 
 ```text
 index.html            页面骨架
+manifest.webmanifest  添加到桌面用的应用信息（名称、图标）
+sw.js                 离线缓存
 assets/css/style.css  样式（浅色 / 深色两套配色）
+assets/fonts/         本地字体（SIL OFL 1.1 授权，见 OFL-*.txt）
+assets/icons/         桌面图标
 assets/js/data.js     内容：主题词表、句型、绘本、动作指令、视频片单
 assets/js/store.js    学习进度、间隔重复、每日计划
 assets/js/speech.js   朗读、录音、语音识别和打星
 assets/js/app.js      页面路由和各个学习活动
 docs/plan.md          网站搭建方案
+docs/deploy-huawei.md 部署到华为学习平板
 ```
+
+> 改动文件后：`sw.js` 会在后台自动取新版本；如果新增或删除了文件，记得同步修改 `sw.js` 里的 `SHELL` 列表并把 `VERSION` 加一。
 
 ## 按 Power Up 单元加词
 

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>小耳朵英语 Little Ears</title>
+  <meta name="description" content="给零基础一年级孩子的每日 15 分钟英语听说练习：认单词、跟我说、听故事、小游戏。">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="小耳朵英语">
+  <meta name="theme-color" content="#EDF3FB">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%23FFB21E'/%3E%3Cpath d='M14 27c-2-2-3-5-3-8a9 9 0 0 1 18 0c0 4-3 5-4 7s-1 5-4 5-3-2-3-2' fill='none' stroke='%231B2541' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Grandstander:wght@700;800&family=Nunito:wght@600;700;800&display=swap">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-in">
+      <a class="brand" href="#/" aria-label="小耳朵英语 首页">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <rect width="40" height="40" rx="12" fill="var(--sun)"/>
+          <path d="M14 27c-2-2-3-5-3-8a9 9 0 0 1 18 0c0 4-3 5-4 7s-1 5-4 5-3-2-3-2" fill="none" stroke="#1B2541" stroke-width="3" stroke-linecap="round"/>
+          <path d="M16.5 19a3.5 3.5 0 0 1 7 0" fill="none" stroke="#1B2541" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <span class="brand-name">小耳朵英语<small>Little Ears</small></span>
+      </a>
+      <div class="top-stats">
+        <span class="chip chip-timer" id="timer" title="今天的学习时间"></span>
+        <a class="chip chip-stars" id="stars" href="#/stickers" title="我的星星和贴纸"></a>
+        <a class="icon-btn" href="#/parent" aria-label="家长中心" title="家长中心" id="parentLink"></a>
+      </div>
+    </div>
+  </header>
+
+  <main id="view" aria-live="polite"></main>
+
+  <nav class="tabbar" aria-label="主导航">
+    <div class="tabbar-in" id="tabs"></div>
+  </nav>
+
+  <div id="layer"></div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/speech.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

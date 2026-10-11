@@ -715,7 +715,23 @@
     const mine = all.filter(s => S.episodes(s.id).length);
     const cur = S.currentSeries();
     const curNext = cur ? S.nextEpisode(cur.id) : -1;
-    const stageGroups = Object.keys(D.stages).map(k => ({ k: +k, info: D.stages[k], list: D.series.filter(s => s.stage === +k) }));
+    const stageGroups = Object.keys(D.stages).map(k => ({
+      info: D.stages[k],
+      list: D.series.filter(s => s.stage === +k && !s.backup),
+      backups: D.series.filter(s => s.stage === +k && s.backup)
+    }));
+    const recItem = s => {
+      const n = S.episodes(s.id).length;
+      return `<div class="rec-item">
+        <span class="art tone-${s.tone}">${picHTML({ pic: s.pic }, 'md')}</span>
+        <div class="rec-main">
+          <h4><span lang="en">${esc(s.title)}</span> <span class="muted">${esc(s.zh)}</span></h4>
+          <div class="tags"><span class="tag">${esc(s.accent)}</span><span class="tag">${esc(s.mins)}</span>${n ? `<span class="tag tag-ok">已添加 ${n} 集</span>` : ''}</div>
+          <p>${esc(s.why)}${s.note ? ' ' + esc(s.note) : ''}</p>
+          <a class="link" href="${biliSearch(s.q)}" target="_blank" rel="noopener">在 B 站搜索 ${icon('external')}</a>
+        </div>
+      </div>`;
+    };
     view.innerHTML = `
       <div class="page-title"><h1>看动画 <span class="sub" lang="en">Cartoons</span></h1></div>
       ${cur ? `
@@ -745,18 +761,9 @@
         <div class="section-head"><h2>推荐片单 <span class="muted">给家长看</span></h2><p>从上往下看，适合零基础的 6–7 岁孩子</p></div>
         ${stageGroups.map(g => `
           <h3 class="stage-title">${esc(g.info.title)} <span class="muted">${esc(g.info.when)}</span></h3>
-          <div class="rec-list">${g.list.map(s => {
-            const n = S.episodes(s.id).length;
-            return `<div class="rec-item">
-              <span class="art tone-${s.tone}">${picHTML({ pic: s.pic }, 'md')}</span>
-              <div class="rec-main">
-                <h4><span lang="en">${esc(s.title)}</span> <span class="muted">${esc(s.zh)}</span></h4>
-                <div class="tags"><span class="tag">${esc(s.accent)}</span><span class="tag">${esc(s.mins)}</span>${n ? `<span class="tag tag-ok">已添加 ${n} 集</span>` : ''}</div>
-                <p>${esc(s.why)}${s.note ? ' ' + esc(s.note) : ''}</p>
-                <a class="link" href="${biliSearch(s.q)}" target="_blank" rel="noopener">在 B 站搜索 ${icon('external')}</a>
-              </div>
-            </div>`;
-          }).join('')}</div>`).join('')}
+          <div class="rec-list">${g.list.map(recItem).join('')}</div>
+          ${g.backups.length ? `<p class="backup-note">备选：上面的在 B 站找不到时，可以换成这些</p>
+          <div class="rec-list">${g.backups.map(recItem).join('')}</div>` : ''}`).join('')}
       </section>`;
   }
 
@@ -1164,7 +1171,9 @@
       ${Object.keys(D.stages).map(k => `
         <section class="grid">
           <h3 class="stage-title">${esc(D.stages[k].title)} <span class="muted">${esc(D.stages[k].when)}</span></h3>
-          ${all.filter(s => s.stage === +k).map(row).join('')}
+          ${all.filter(s => s.stage === +k && !s.backup).map(row).join('')}
+          <p class="backup-note">备选：上面的找不到时用</p>
+          ${all.filter(s => s.stage === +k && s.backup).map(row).join('')}
         </section>`).join('')}
       <section class="grid">
         <h3 class="stage-title">自己添加的系列</h3>

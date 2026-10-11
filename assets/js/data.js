@@ -11,7 +11,8 @@
 window.LE = window.LE || {};
 
 LE.DATA = {
-  /* 看动画：stage 1 入门 → 2 进阶 → 3 提高。q 是在 B 站搜索用的关键词 */
+  /* 看动画：stage 1 入门 → 2 进阶 → 3 提高。q 是在 B 站搜索用的关键词；
+     backup: true 是备选，上面的系列在 B 站找不到时用。系列 id 不要改，孩子的进度按 id 记录 */
   stages: {
     1: { title: '入门：儿歌和小对话', when: '第 1–2 个月' },
     2: { title: '进阶：生活动画和自然拼读', when: '第 2–4 个月' },
@@ -19,7 +20,7 @@ LE.DATA = {
   },
   series: [
     { id: 'sss', stage: 1, title: 'Super Simple Songs', zh: '超级简单儿歌', pic: '🎵', tone: 'sun', accent: '美音', mins: '每首 2–3 分钟', why: '儿歌配动作，旋律简单、重复多，零基础从这里开始最轻松。', q: 'Super Simple Songs', note: 'Super Simple 官方说明国内可以在 UKids App 观看。' },
-    { id: 'steve', stage: 1, title: 'Steve and Maggie', zh: '史蒂夫和麦琪', pic: '🐦', tone: 'sky', accent: '英音', mins: '每集 5–10 分钟', why: '英国老师 Steve 和喜鹊玩偶 Maggie，专门给非英语国家的小朋友做的，边玩边说，很多互动提问。', q: 'Steve and Maggie' },
+    { id: 'blues', stage: 1, title: "Blue's Clues & You!", zh: '蓝色斑点狗', pic: '🐾', tone: 'sky', accent: '美音', mins: '每集约 20 分钟，可以分两天看', why: '主持人带着小狗 Blue 找线索，会停下来等屏幕前的孩子回答，句子慢、重复多，很适合边看边开口。', q: "Blue's Clues 蓝色斑点狗 英文" },
     { id: 'singsing', stage: 1, title: 'English Singsing', zh: '英语小对话', pic: '💬', tone: 'leaf', accent: '美音', mins: '每集 1–3 分钟', why: '一集一个生活小对话，句子短、重复多，看完最适合到「跟我说」里练。', q: 'English Singsing' },
     { id: 'maisy', stage: 1, title: 'Maisy Mouse', zh: '小鼠波波', pic: '🐭', tone: 'berry', accent: '英音', mins: '每集 5 分钟', why: '画面简单、语速慢、句子极短，刚开始看动画时最容易听懂。', q: 'Maisy Mouse 英文' },
     { id: 'peppa', stage: 2, title: 'Peppa Pig', zh: '小猪佩奇（英文版）', pic: '🐷', tone: 'berry', accent: '英音', mins: '每集 5 分钟', why: '家里、幼儿园、公园的日常生活，句子都很常用，孩子也爱看。', q: 'Peppa Pig 英文版' },
@@ -29,7 +30,15 @@ LE.DATA = {
     { id: 'muzzy', stage: 3, title: 'Muzzy', zh: 'BBC 英语动画课', pic: '👾', tone: 'grape', accent: '英音', mins: '每集约 15 分钟', why: 'BBC 专门为外语学习者做的经典动画课程，故事里循序渐进地教常用句子，有 5–7 岁版本。', q: 'Muzzy BBC 英语动画' },
     { id: 'gogo', stage: 3, title: 'Gogo Loves English', zh: 'Gogo 学英语', pic: '📺', tone: 'sun', accent: '美音', mins: '每集约 10 分钟', why: '配套教材的系统动画课，每集一个主题（食物、学校、玩具……），句型由浅入深。', q: 'Gogo Loves English' },
     { id: 'duggee', stage: 3, title: 'Hey Duggee', zh: '嗨道奇', pic: '🐶', tone: 'sky', accent: '英音', mins: '每集 7 分钟', why: '大狗 Duggee 带小动物们做各种活动，剧情有趣，语速稍快。', q: 'Hey Duggee 英文' },
-    { id: 'bluey', stage: 3, title: 'Bluey', zh: '布鲁伊', pic: '🐕', tone: 'leaf', accent: '澳式', mins: '每集 7 分钟', why: '一家人玩游戏的小故事，非常好看，语速较快，适合学了半年以后。', q: 'Bluey 英文版' }
+    { id: 'bluey', stage: 3, title: 'Bluey', zh: '布鲁伊', pic: '🐕', tone: 'leaf', accent: '澳式', mins: '每集 7 分钟', why: '一家人玩游戏的小故事，非常好看，语速较快，适合学了半年以后。', q: 'Bluey 英文版' },
+
+    /* 备选 */
+    { id: 'caillou', stage: 1, backup: true, title: 'Caillou', zh: '卡由', pic: '👦', tone: 'sun', accent: '美音', mins: '每个小故事 5–7 分钟', why: '4 岁小男孩的日常生活，语速慢，句子简单。', q: 'Caillou 卡由 英文版' },
+    { id: 'daniel', stage: 1, backup: true, title: "Daniel Tiger's Neighborhood", zh: '小老虎丹尼尔', pic: '🐯', tone: 'berry', accent: '美音', mins: '每个故事约 11 分钟', why: '每集一个生活小道理，配一首短歌反复唱，好记好跟。', q: 'Daniel Tiger 小老虎丹尼尔 英文' },
+    { id: 'benholly', stage: 2, backup: true, title: "Ben and Holly's Little Kingdom", zh: '班班和莉莉的小王国', pic: '🧚', tone: 'grape', accent: '英音', mins: '每集约 11 分钟', why: '小猪佩奇原班团队制作，英音清楚，精灵和魔法的故事更有想象力。', q: 'Ben and Holly 班班和莉莉 英文' },
+    { id: 'maxruby', stage: 2, backup: true, title: 'Max & Ruby', zh: '小兔麦斯和露比', pic: '🐰', tone: 'berry', accent: '美音', mins: '每个故事约 7 分钟', why: '姐姐和弟弟的家常小故事，对话短，弟弟 Max 话少、好模仿。', q: 'Max and Ruby 小兔麦斯和露比 英文' },
+    { id: 'octonauts', stage: 3, backup: true, title: 'Octonauts', zh: '海底小纵队', pic: '🐙', tone: 'sky', accent: '英音', mins: '每集约 11 分钟', why: '海底探险加海洋动物知识，孩子很爱看，生词稍多。', q: 'Octonauts 海底小纵队 英文版' },
+    { id: 'charlie', stage: 3, backup: true, title: 'Charlie and Lola', zh: '查理和罗拉', pic: '👧', tone: 'sun', accent: '英音', mins: '每集约 11 分钟', why: '哥哥哄妹妹的小故事，英式童音，对白比较多，适合听力进步以后。', q: 'Charlie and Lola 查理和罗拉 英文' }
   ],
 
   /* 跟我说：日常口语小课 */

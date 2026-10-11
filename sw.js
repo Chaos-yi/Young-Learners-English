@@ -5,7 +5,7 @@
  * 策略：先用缓存里的版本立即显示，同时在后台联网取新版本；下次打开就是新版本。
  * 增删文件时更新 SHELL 列表并把 VERSION 加一。
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = 'little-ears-' + VERSION;
 const SHELL = [
   './',

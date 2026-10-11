@@ -2,10 +2,9 @@
  * 小耳朵英语 · 语音
  * ------------------------------------------------------------
  * speak()   浏览器语音合成朗读，支持逐词回调（用于指读高亮）
- * capture() 录音（MediaRecorder）+ 语音识别（SpeechRecognition，有则用）
- * score()   把识别结果和目标句比较，给 1–3 颗星（只要开口就至少 1 颗）
+ * capture() 录音（MediaRecorder），给孩子回放自己的声音；不识别、不打分
  *
- * 正式版建议把 speak() 换成播放预生成的 mp3，把 score() 换成口语评测 API。
+ * 正式版建议把 speak() 换成播放预生成的 mp3。
  */
 (function () {
   const synth = window.speechSynthesis || null;
@@ -83,131 +82,47 @@
     current = null;
   }
 
-  // ---------- 录音 + 识别 ----------
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  // ---------- 录音 ----------
   const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
 
   /*
-   * capture({ maxMs }) → 控制器 { stop(), done: Promise<{ url, transcripts, error }> }
-   * 识别和录音各自失败不影响对方；都失败时 error 有值，界面改为家长打星。
+   * capture({ maxMs }) → 控制器 { stop(), done: Promise<{ url, error }> }
+   * 只录音、回放，不做识别和打分；录不了时 error 有值（denied / no-mic / unsupported）。
    */
   function capture(opts) {
     opts = opts || {};
-    const maxMs = opts.maxMs || 6000;
-    let stream = null, recorder = null, recog = null;
+    let stream = null, recorder = null, stopped = false, timer = null;
     const chunks = [];
-    const transcripts = [];
-    let stopped = false;
     let resolveDone;
     const done = new Promise(r => { resolveDone = r; });
-    let recorderDone = !canRecord;
-    let recogDone = !Recognition;
-    let url = null;
-    let error = null;
-    let timer = null;
+    const finish = (url, error) => {
+      clearTimeout(timer);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      resolveDone({ url: url || null, error: url ? null : (error || 'no-input') });
+    };
 
-    function maybeFinish() {
-      if (recorderDone && recogDone) {
-        if (stream) stream.getTracks().forEach(t => t.stop());
-        resolveDone({ url, transcripts, error: url || transcripts.length ? null : (error || 'no-input') });
-      }
+    if (!canRecord) {
+      setTimeout(() => finish(null, 'unsupported'), 0);
+      return { stop() {}, done };
     }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(s => {
+      stream = s;
+      if (stopped) { finish(null, 'no-input'); return; }
+      const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+      recorder = type ? new MediaRecorder(s, { mimeType: type }) : new MediaRecorder(s);
+      recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.onstop = () => finish(chunks.length ? URL.createObjectURL(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' })) : null);
+      recorder.start();
+    }).catch(e => finish(null, e && e.name === 'NotAllowedError' ? 'denied' : 'no-mic'));
 
-    function stopAll() {
+    function stop() {
       if (stopped) return;
       stopped = true;
       clearTimeout(timer);
-      try { if (recorder && recorder.state !== 'inactive') recorder.stop(); else { recorderDone = true; } } catch (e) { recorderDone = true; }
-      try { if (recog) recog.stop(); } catch (e) { recogDone = true; }
-      // 识别结果有时迟到，最多再等 1.5 秒
-      setTimeout(() => { recogDone = true; maybeFinish(); }, 1500);
-      maybeFinish();
+      try { if (recorder && recorder.state !== 'inactive') recorder.stop(); } catch (e) { finish(null, 'no-input'); }
     }
-
-    if (canRecord) {
-      navigator.mediaDevices.getUserMedia({ audio: true }).then(s => {
-        stream = s;
-        if (stopped) { recorderDone = true; maybeFinish(); return; }
-        const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac'].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
-        recorder = type ? new MediaRecorder(s, { mimeType: type }) : new MediaRecorder(s);
-        recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-        recorder.onstop = () => {
-          if (chunks.length) url = URL.createObjectURL(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }));
-          recorderDone = true;
-          maybeFinish();
-        };
-        recorder.start();
-      }).catch(e => {
-        error = e && e.name === 'NotAllowedError' ? 'denied' : 'no-mic';
-        recorderDone = true;
-        maybeFinish();
-      });
-    }
-
-    if (Recognition) {
-      try {
-        recog = new Recognition();
-        recog.lang = LE.store.settings.accent;
-        recog.interimResults = false;
-        recog.maxAlternatives = 5;
-        recog.continuous = false;
-        recog.onresult = e => {
-          for (let i = 0; i < e.results.length; i++) {
-            for (let j = 0; j < e.results[i].length; j++) transcripts.push(e.results[i][j].transcript);
-          }
-        };
-        recog.onerror = e => { if (!error && e.error === 'not-allowed') error = 'denied'; };
-        recog.onend = () => { recogDone = true; if (stopped) maybeFinish(); };
-        recog.start();
-      } catch (e) {
-        recogDone = true;
-      }
-    }
-
-    if (!canRecord && !Recognition) {
-      error = 'unsupported';
-      setTimeout(maybeFinish, 0);
-    }
-
-    timer = setTimeout(stopAll, maxMs);
-    return { stop: stopAll, done };
-  }
-
-  // ---------- 打分 ----------
-  const CONTRACTIONS = {
-    "it's": 'it is', "i'm": 'i am', "what's": 'what is', "where's": 'where is', "who's": 'who is',
-    "he's": 'he is', "she's": 'she is', "here's": 'here is', "let's": 'let us', "i've": 'i have',
-    "don't": 'do not', "can't": 'can not', "that's": 'that is', "there's": 'there is'
-  };
-  const NUMS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-
-  function tokens(text) {
-    return text.toLowerCase()
-      .replace(/[’‘]/g, "'")
-      .replace(/[^a-z0-9' ]+/g, ' ')
-      .split(/\s+/)
-      .filter(Boolean)
-      .map(w => CONTRACTIONS[w] || (/^\d+$/.test(w) && NUMS[+w]) || w)
-      .join(' ')
-      .split(' ')
-      .map(w => w.replace(/'/g, ''));
-  }
-
-  function match(target, heard) {
-    const want = tokens(target);
-    const got = tokens(heard);
-    let hit = 0;
-    want.forEach(w => {
-      const i = got.indexOf(w);
-      if (i >= 0) { hit += 1; got.splice(i, 1); }
-    });
-    return want.length ? hit / want.length : 0;
-  }
-
-  function score(target, transcripts) {
-    if (!transcripts || !transcripts.length) return null;
-    const best = Math.max.apply(null, transcripts.map(t => match(target, t)));
-    return best >= 0.8 ? 3 : best >= 0.5 ? 2 : 1;
+    timer = setTimeout(stop, opts.maxMs || 6000);
+    return { stop, done };
   }
 
   /*
@@ -229,16 +144,15 @@
     });
   }
 
-  function praise(stars) {
-    const list = LE.DATA.praise[stars] || LE.DATA.praise[1];
+  function cheer() {
+    const list = LE.DATA.cheers;
     return list[Math.floor(Math.random() * list.length)];
   }
 
   LE.speech = {
-    speak, stop, capture, score, praise, tokens, voiceStatus,
+    speak, stop, capture, cheer, voiceStatus,
     get supported() { return !!synth; },
     get canRecord() { return canRecord; },
-    get canRecognize() { return !!Recognition; },
     get voices() { if (!voices.length) loadVoices(); return voices; },
     pickVoice
   };

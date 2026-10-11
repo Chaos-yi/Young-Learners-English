@@ -1,33 +1,29 @@
 /*
  * 小耳朵英语 · 学习进度
  * ------------------------------------------------------------
+ * 不打分，只记录「学到哪里了」：每个视频系列看到第几集、跟我说学到第几课、磨耳朵玩到第几关。
  * 原型阶段用 localStorage 保存在本机浏览器；正式版换成云端同步时只需替换 load/save。
- * 复习算法：5 级 Leitner 盒子。新词学过进 1 级；答对升一级，答错回 1 级。
  */
 (function () {
-  const KEY = 'little-ears.v1';
-  const INTERVALS = [0, 1, 2, 4, 7, 15]; // 盒子等级 → 间隔天数
-  const MASTERED = 4;
+  const KEY = 'little-ears.v2';
 
   const DEFAULTS = {
     settings: {
       name: 'Tom',
       age: 6,
       dailyMinutes: 15,
-      newPerDay: 5,
-      themes: ['hello', 'colours', 'animals'],
       accent: 'en-GB',
       rate: 0.85,
       voiceURI: '',
       showChinese: true
     },
-    words: {},
-    sentences: {},
-    stories: {},
-    days: {},
+    // 视频：lists[系列id] = { episodes: [{ kind: 'bili', bvid, page } | { kind: 'file', src }], watched: [集序号] }
+    videos: { lists: {}, custom: [], current: '' },
+    lessons: {},            // lessons[课id] = { done: true, n: 学过几遍 }
+    games: { listen: 0, move: 0 },
+    days: {},               // days['YYYY-MM-DD'] = { secs, steps: {}, done, log: { watched, lessons, games } }
     stars: 0,
-    stickers: [],
-    videos: []
+    stickers: []
   };
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -39,6 +35,8 @@
     if (saved && typeof saved === 'object') {
       Object.assign(s, saved);
       s.settings = Object.assign(clone(DEFAULTS.settings), saved.settings || {});
+      s.videos = Object.assign(clone(DEFAULTS.videos), saved.videos || {});
+      s.games = Object.assign(clone(DEFAULTS.games), saved.games || {});
     }
     return s;
   }
@@ -59,9 +57,7 @@
   // ---------- 日期 ----------
   function dateKey(d) {
     d = d || new Date();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return d.getFullYear() + '-' + m + '-' + day;
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
   function addDays(key, n) {
     const [y, m, d] = key.split('-').map(Number);
@@ -69,164 +65,110 @@
   }
   function today() { return dateKey(); }
 
-  // ---------- 内容索引 ----------
-  const D = LE.DATA;
-  const themeById = {};
-  const wordById = {};
-  D.themes.forEach(t => {
-    themeById[t.id] = t;
-    t.words.forEach((w, i) => {
-      w.id = t.id + ':' + w.en;
-      w.theme = t.id;
-      w.index = i;
-      wordById[w.id] = w;
-    });
-  });
-  const sentenceById = {};
-  D.sentences.forEach(s => { sentenceById[s.id] = s; });
-  const storyById = {};
-  D.stories.forEach(s => { storyById[s.id] = s; });
-
-  // ---------- 每日记录 ----------
   function day(key) {
     key = key || today();
-    if (!state.days[key]) state.days[key] = { secs: 0, stars: 0, steps: {}, plan: null, done: false };
-    return state.days[key];
+    if (!state.days[key]) state.days[key] = { secs: 0, steps: {}, done: false, log: { watched: 0, lessons: 0, games: 0 } };
+    const d = state.days[key];
+    if (!d.log) d.log = { watched: 0, lessons: 0, games: 0 };
+    return d;
   }
 
   function addStars(n) {
     state.stars += n;
-    day().stars += n;
     save();
     document.dispatchEvent(new CustomEvent('le:stars'));
   }
 
-  // ---------- 单词与复习 ----------
-  function wordState(id) { return state.words[id] || null; }
+  // ---------- 内容索引 ----------
+  const D = LE.DATA;
+  const lessonById = {};
+  D.lessons.forEach((l, i) => { l.index = i; lessonById[l.id] = l; });
+  const themeById = {};
+  D.themes.forEach(t => { themeById[t.id] = t; t.words.forEach(w => { w.id = t.id + ':' + w.en; w.theme = t.id; }); });
 
-  function markSeen(id) {
-    const w = state.words[id];
-    if (!w) {
-      state.words[id] = { box: 1, due: addDays(today(), INTERVALS[1]), seen: 1, right: 0, wrong: 0 };
-    } else {
-      w.seen += 1;
-    }
+  // ---------- 看动画 ----------
+  function seriesList() {
+    return D.series.concat(state.videos.custom.map(c => Object.assign({ stage: 0, pic: '📺', tone: 'sky', custom: true }, c)));
+  }
+  function seriesById(id) { return seriesList().find(s => s.id === id) || null; }
+  function list(id) {
+    if (!state.videos.lists[id]) state.videos.lists[id] = { episodes: [], watched: [] };
+    return state.videos.lists[id];
+  }
+  function episodes(id) { return (state.videos.lists[id] || { episodes: [] }).episodes; }
+  function watched(id) { return (state.videos.lists[id] || { watched: [] }).watched; }
+  function setEpisodes(id, eps) {
+    const l = list(id);
+    l.episodes = eps;
+    l.watched = l.watched.filter(i => i < eps.length);
+    saveNow();
+  }
+  function markWatched(id, idx) {
+    const l = list(id);
+    state.videos.current = id;
+    if (l.watched.indexOf(idx) >= 0) { save(); return false; }
+    l.watched.push(idx);
+    day().log.watched += 1;
+    save();
+    return true;
+  }
+  // 下一集：上次看过的那集之后第一集没看过的；都看完了返回 -1
+  function nextEpisode(id) {
+    const eps = episodes(id), w = watched(id);
+    if (!eps.length) return -1;
+    const last = w.length ? Math.max.apply(null, w) : -1;
+    for (let i = last + 1; i < eps.length; i++) if (w.indexOf(i) < 0) return i;
+    for (let i = 0; i < eps.length; i++) if (w.indexOf(i) < 0) return i;
+    return -1;
+  }
+  // 正在看的系列：家长/孩子最近选的；它看完了就按推荐顺序找下一个有视频、没看完的
+  function currentSeries() {
+    const all = seriesList();
+    const ready = s => episodes(s.id).length && nextEpisode(s.id) >= 0;
+    const cur = all.find(s => s.id === state.videos.current);
+    if (cur && ready(cur)) return cur;
+    return all.find(ready) || null;
+  }
+  function setCurrent(id) { state.videos.current = id; save(); }
+  function removeCustom(id) {
+    state.videos.custom = state.videos.custom.filter(c => c.id !== id);
+    delete state.videos.lists[id];
+    if (state.videos.current === id) state.videos.current = '';
+    saveNow();
+  }
+  function addCustom(title) {
+    const id = 'c' + Date.now().toString(36);
+    state.videos.custom.push({ id, stage: 0, title, zh: '家长添加', why: '', q: title });
+    saveNow();
+    return id;
+  }
+
+  // ---------- 跟我说 ----------
+  function lessonDone(id) { return !!(state.lessons[id] && state.lessons[id].done); }
+  function nextLesson() { return D.lessons.find(l => !lessonDone(l.id)) || null; }
+  function completeLesson(id) {
+    const rec = state.lessons[id] || { done: false, n: 0 };
+    const first = !rec.done;
+    rec.done = true;
+    rec.n += 1;
+    state.lessons[id] = rec;
+    day().log.lessons += 1;
+    save();
+    return first;
+  }
+  function lessonsDone() { return D.lessons.filter(l => lessonDone(l.id)).length; }
+
+  // ---------- 磨耳朵 ----------
+  function listenLevel() { return state.games.listen + 1; }
+  function levelTheme(level) { return D.themes[(level - 1) % D.themes.length]; }
+  function finishGame(kind) {
+    state.games[kind] = (state.games[kind] || 0) + 1;
+    day().log.games += 1;
     save();
   }
 
-  function grade(id, ok) {
-    const w = state.words[id] || { box: 0, due: today(), seen: 0, right: 0, wrong: 0 };
-    w.seen += 1;
-    if (ok) {
-      w.right += 1;
-      w.box = Math.min(w.box + 1, INTERVALS.length - 1);
-    } else {
-      w.wrong += 1;
-      w.box = 1;
-    }
-    w.due = addDays(today(), INTERVALS[w.box]);
-    state.words[id] = w;
-    save();
-  }
-
-  function dueWords(limit) {
-    const t = today();
-    return Object.keys(state.words)
-      .filter(id => wordById[id] && state.words[id].due <= t)
-      .sort((a, b) => state.words[a].due.localeCompare(state.words[b].due) || state.words[a].box - state.words[b].box)
-      .slice(0, limit);
-  }
-
-  function themeProgress(themeId) {
-    const t = themeById[themeId];
-    let learned = 0, mastered = 0;
-    t.words.forEach(w => {
-      const s = state.words[w.id];
-      if (s) learned += 1;
-      if (s && s.box >= MASTERED) mastered += 1;
-    });
-    return { total: t.words.length, learned, mastered };
-  }
-
-  function totals() {
-    const ids = Object.keys(state.words).filter(id => wordById[id]);
-    return {
-      learned: ids.length,
-      mastered: ids.filter(id => state.words[id].box >= MASTERED).length
-    };
-  }
-
-  // ---------- 句型与故事 ----------
-  function practiseSentence(id, starsGot) {
-    const s = state.sentences[id] || { n: 0, best: 0 };
-    s.n += 1;
-    s.best = Math.max(s.best, starsGot);
-    state.sentences[id] = s;
-    save();
-  }
-  function readStory(id) {
-    const s = state.stories[id] || { n: 0 };
-    s.n += 1;
-    state.stories[id] = s;
-    save();
-  }
-
-  // ---------- 今日计划 ----------
-  function selectedThemes() {
-    const ids = state.settings.themes.filter(id => themeById[id]);
-    return ids.length ? ids : [D.themes[0].id];
-  }
-
-  function buildPlan() {
-    const themes = selectedThemes();
-    const review = dueWords(6);
-
-    // 新词：先从选中的主题里找没学过的；都学完了就顺延到其他主题
-    const order = themes.concat(D.themes.map(t => t.id).filter(id => themes.indexOf(id) < 0));
-    const fresh = [];
-    order.forEach(tid => {
-      themeById[tid].words.forEach(w => {
-        if (fresh.length < state.settings.newPerDay && !state.words[w.id] && review.indexOf(w.id) < 0) fresh.push(w.id);
-      });
-    });
-
-    // 句型：选中主题里练得最少的 2 个
-    let pool = D.sentences.filter(s => themes.indexOf(s.theme) >= 0);
-    if (pool.length < 2) pool = D.sentences.slice();
-    const sentences = pool
-      .map((s, i) => ({ id: s.id, n: (state.sentences[s.id] || { n: 0 }).n, i }))
-      .sort((a, b) => a.n - b.n || a.i - b.i)
-      .slice(0, 2)
-      .map(s => s.id);
-
-    // 故事：和选中主题相关、读得最少的一本
-    let stories = D.stories.filter(s => s.themes.some(t => themes.indexOf(t) >= 0));
-    if (!stories.length) stories = D.stories.slice();
-    stories.sort((a, b) => (state.stories[a.id] || { n: 0 }).n - (state.stories[b.id] || { n: 0 }).n);
-
-    return { review, fresh, sentences, story: stories[0].id };
-  }
-
-  function todayPlan() {
-    const d = day();
-    if (!d.plan) {
-      d.plan = buildPlan();
-      save();
-    }
-    return d.plan;
-  }
-
-  function resetTodayPlan() {
-    const d = day();
-    if (!Object.keys(d.steps).length) d.plan = null;
-    save();
-  }
-
-  function completeStep(step) {
-    const d = day();
-    d.steps[step] = true;
-    save();
-  }
+  // ---------- 今日路线 ----------
+  function completeStep(step) { day().steps[step] = true; save(); }
 
   // 完成今日路线：解锁贴纸，返回新贴纸（当天已解锁则返回 null）
   function completeDay() {
@@ -249,8 +191,14 @@
   }
 
   // 计时每秒调用一次，不在这里写盘；由调用方定期 save()，离开页面时 pagehide 也会保存
-  function addSeconds(n) {
-    day().secs += n;
+  function addSeconds(n) { day().secs += n; }
+
+  function totals() {
+    return {
+      watched: Object.keys(state.videos.lists).reduce((n, id) => n + state.videos.lists[id].watched.length, 0),
+      lessons: lessonsDone(),
+      games: state.games.listen + state.games.move
+    };
   }
 
   function reset() {
@@ -261,10 +209,11 @@
   LE.store = {
     get state() { return state; },
     get settings() { return state.settings; },
-    save, saveNow, today, addDays, dateKey,
-    themeById, wordById, sentenceById, storyById,
-    day, addStars, wordState, markSeen, grade, dueWords, themeProgress, totals,
-    practiseSentence, readStory, selectedThemes, todayPlan, resetTodayPlan, completeStep, completeDay,
-    streak, addSeconds, reset, MASTERED
+    save, saveNow, today, addDays, day, addStars,
+    lessonById, themeById,
+    seriesList, seriesById, episodes, watched, setEpisodes, markWatched, nextEpisode, currentSeries, setCurrent, addCustom, removeCustom,
+    lessonDone, nextLesson, completeLesson, lessonsDone,
+    listenLevel, levelTheme, finishGame,
+    completeStep, completeDay, streak, addSeconds, totals, reset
   };
 })();

@@ -1166,7 +1166,7 @@
           <li>复制浏览器地址栏里的链接，粘贴到「视频链接」。合集只要粘贴一个链接，再填总集数。</li>
           <li>点「保存」。孩子在「看动画」里就能按顺序一集一集看，看完的会打勾。</li>
         </ol>
-        <p class="muted">视频在 B 站的播放器里播放，网站本身不存视频。</p>
+        <p class="muted">视频在 B 站的播放器里播放，网站本身不存视频。已经在别的设备上填好了？到「学习设置 → 备份与恢复」搬过来，不用重新填。</p>
       </section>
       ${Object.keys(D.stages).map(k => `
         <section class="grid">
@@ -1254,6 +1254,13 @@
         </div>
         <div class="field"><span class="label">中文提示</span>${seg('showChinese', [[true, '显示'], [false, '不显示']])}
           <span class="help">「跟我说」里每句下面的中文意思；孩子熟悉后可以关掉</span></div>
+        <div class="field">
+          <span class="label">备份与恢复</span>
+          <span class="help">换设备、换网址时用。在原来的设备上点「复制备份」，通过微信「文件传输助手」等发到新设备；在新设备上把内容粘贴到下面，点「恢复」。备份里有视频链接、学习进度和设置。</span>
+          <div><button class="btn btn-soft" type="button" id="copyBackup">复制备份</button></div>
+          <textarea id="backupText" class="input" rows="3" placeholder="把备份内容粘贴到这里" aria-label="备份内容"></textarea>
+          <div><button class="btn" type="button" id="restoreBackup">恢复</button></div>
+        </div>
         <div class="field danger">
           <span class="label">重置</span>
           <div><button class="btn btn-ghost" type="button" id="resetAll">${icon('trash')} 清空所有学习记录和视频</button></div>
@@ -1278,6 +1285,40 @@
     $('#testVoice').onclick = () => SP.speak(`Hello, ${s.name}! Let's learn English together.`);
     $('#setRate').oninput = e => { s.rate = +e.target.value; $('#rateVal').textContent = s.rate.toFixed(2); };
     $('#setRate').onchange = () => { changed(); SP.speak('This is my speed.'); };
+    $('#copyBackup').onclick = () => {
+      const box = $('#backupText');
+      box.value = S.exportData();
+      const manual = () => { box.focus(); box.select(); toast('请长按输入框里的文字，全选后复制'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(box.value).then(() => toast('已复制，可以粘贴到微信发给新设备'), manual);
+      } else {
+        manual();
+      }
+    };
+    let restoreArmed = false;
+    $('#restoreBackup').onclick = e => {
+      const text = $('#backupText').value.trim();
+      if (!text) { toast('请先把备份内容粘贴到上面的输入框'); return; }
+      if (!restoreArmed) {
+        restoreArmed = true;
+        e.currentTarget.textContent = '再点一次确认（会覆盖这台设备上的记录）';
+        setTimeout(() => {
+          restoreArmed = false;
+          const b = $('#restoreBackup');
+          if (b) b.textContent = '恢复';
+        }, 5000);
+        return;
+      }
+      restoreArmed = false;
+      if (!S.importData(text)) {
+        e.currentTarget.textContent = '恢复';
+        toast('没认出这段备份，请确认复制完整了');
+        return;
+      }
+      renderHeader();
+      toast('已恢复：视频链接、学习进度和设置都搬过来了');
+      parentSettings(body);
+    };
     let armed = false;
     $('#resetAll').onclick = e => {
       if (!armed) {

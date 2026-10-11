@@ -28,9 +28,8 @@
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
-  function load() {
-    let saved = null;
-    try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
+  // 补齐缺少的字段（旧版本的数据、备份恢复都走这里）
+  function normalize(saved) {
     const s = clone(DEFAULTS);
     if (saved && typeof saved === 'object') {
       Object.assign(s, saved);
@@ -39,6 +38,12 @@
       s.games = Object.assign(clone(DEFAULTS.games), saved.games || {});
     }
     return s;
+  }
+
+  function load() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
+    return normalize(saved);
   }
 
   let state = load();
@@ -206,6 +211,21 @@
     saveNow();
   }
 
+  // 备份与恢复：换设备、换网址时把视频链接、进度和设置整个搬过去
+  function exportData() {
+    saveNow();
+    return JSON.stringify({ app: 'little-ears', version: 2, savedAt: new Date().toISOString(), data: state });
+  }
+  function importData(text) {
+    let obj = null;
+    try { obj = JSON.parse(String(text).trim()); } catch (e) { return false; }
+    if (!obj || obj.app !== 'little-ears' || !obj.data || typeof obj.data !== 'object') return false;
+    state = normalize(obj.data);
+    saveNow();
+    document.dispatchEvent(new CustomEvent('le:stars'));
+    return true;
+  }
+
   LE.store = {
     get state() { return state; },
     get settings() { return state.settings; },
@@ -214,6 +234,6 @@
     seriesList, seriesById, episodes, watched, setEpisodes, markWatched, nextEpisode, currentSeries, setCurrent, addCustom, removeCustom,
     lessonDone, nextLesson, completeLesson, lessonsDone,
     listenLevel, levelTheme, finishGame,
-    completeStep, completeDay, streak, addSeconds, totals, reset
+    completeStep, completeDay, streak, addSeconds, totals, reset, exportData, importData
   };
 })();

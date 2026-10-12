@@ -30,26 +30,7 @@
 2. **`sw.js` 不要缓存**，否则平板可能很久拿不到新内容。
 3. 确认 `.webmanifest` 和 `.woff2` 文件返回正确的类型。
 
-以 Nginx 为例（证书配置按云厂商的说明填写）：
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name 你的域名;
-    root /var/www/little-ears;          # 仓库文件放在这里
-
-    location = /sw.js {
-        add_header Cache-Control "no-cache";
-    }
-    location ~ \.webmanifest$ {
-        types { application/manifest+json webmanifest; }
-    }
-    location ~ \.woff2$ {
-        types { font/woff2 woff2; }
-        add_header Cache-Control "max-age=2592000";
-    }
-}
-```
+可直接使用仓库里的 Nginx 配置和部署脚本。购买服务器、域名、ICP 备案、HTTPS 证书、DNS，以及用 SSH/rsync 或 GitHub Actions 发布，按 [`DEPLOY_CN.md`](DEPLOY_CN.md) 操作。配置文件在 `deploy/nginx/`，发布脚本是 `deploy/deploy.sh`。
 
 国内服务器绑定域名需要先完成 ICP 备案。
 
@@ -122,7 +103,7 @@ server {
 ## 常见问题
 
 **打不开，或者一直在转圈**
-`github.io` 在国内部分网络下比较慢。尽量用家里 Wi-Fi，过一会儿再试；只要成功打开过一次并刷新过，以后就从平板本地打开，不再受网速影响。如果长期打不开，可以改放到国内的静态网站托管（腾讯云 / 阿里云，需要一个自己的域名并完成备案）。
+`github.io` 在国内部分网络下比较慢。尽量用家里 Wi-Fi，过一会儿再试；只要成功打开过一次并刷新过，以后就从平板本地打开，不再受网速影响。如果长期打不开，改放到国内服务器。一步步的购买、备案和发布说明在 [`DEPLOY_CN.md`](DEPLOY_CN.md)。
 
 **显示 404**
 检查网址大小写，以及第一步的 Pages 设置是否已保存、是否显示了 *Your site is live*。

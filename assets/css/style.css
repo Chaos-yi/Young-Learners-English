@@ -172,9 +172,31 @@ main {
   max-width: 1040px;
   margin: 0 auto;
   padding-inline: 16px;
-  padding-block: 20px calc(110px + env(safe-area-inset-bottom, 0px));
+  padding-block: 20px 16px;
   display: grid;
   gap: 20px;
+}
+.site-footer {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 8px 16px calc(108px + env(safe-area-inset-bottom, 0px));
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.6;
+  text-align: center;
+}
+.beian-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  justify-content: center;
+  margin: 0;
+}
+.site-footer a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;

@@ -36,6 +36,43 @@
 
   <main id="view" aria-live="polite"></main>
 
+  <footer class="site-footer">
+    <!--
+      ICP / 公安备案号占位。上线前只改下面两处文字，ICP 的 href 保持不动：
+      - 把「京ICP备XXXXXXXX号」换成真实编号，例如 京ICP备12345678号-1。
+        href 必须保持 https://beian.miit.gov.cn/
+      - 把「京公网安备XXXXXXXXXXXXX号」换成真实编号，例如 京公网安备11010502012345号。
+        编号里的连续数字会自动接到 https://www.beian.gov.cn/ 的查询链接上。
+      文字里还连续出现 X 时，链接先隐藏，避免备案审核时页面上出现假编号。
+      步骤见 docs/DEPLOY_CN.md。
+    -->
+    <p class="beian-row">
+      <a id="beian-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备XXXXXXXX号</a>
+      <a id="beian-mps" href="https://www.beian.gov.cn/" target="_blank" rel="noopener noreferrer">京公网安备XXXXXXXXXXXXX号</a>
+    </p>
+  </footer>
+  <script>
+  (function () {
+    function ready(el) {
+      if (!el) return false;
+      var text = (el.textContent || "").replace(/\s+/g, "");
+      if (!text || /X{4,}/.test(text)) {
+        el.hidden = true;
+        return false;
+      }
+      el.hidden = false;
+      return true;
+    }
+    ready(document.getElementById("beian-icp"));
+    var mps = document.getElementById("beian-mps");
+    if (!ready(mps)) return;
+    var digits = (mps.textContent || "").replace(/\D/g, "");
+    if (digits.length >= 6) {
+      mps.href = "https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=" + digits;
+    }
+  })();
+  </script>
+
   <nav class="tabbar" aria-label="主导航">
     <div class="tabbar-in" id="tabs"></div>
   </nav>

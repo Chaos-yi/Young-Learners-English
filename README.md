@@ -5,6 +5,7 @@
 
 - 搭建思路（目标、每日路线、功能结构、视频片单、跟我说课程、技术方案）：[`docs/plan.md`](docs/plan.md)
 - **部署到华为学习平板**（一步步操作）：[`docs/deploy-huawei.md`](docs/deploy-huawei.md)
+- **部署到国内云服务器**（阿里云 / 腾讯云、Nginx、ICP 备案）：[`docs/DEPLOY_CN.md`](docs/DEPLOY_CN.md)
 - 可运行原型：本仓库根目录的 `index.html`（纯静态，无需安装任何依赖）
 
 ## 四个分栏
@@ -28,8 +29,9 @@ python3 -m http.server 8000
 **给孩子在平板 / 手机上用：** 部署成 https 网站，用平板浏览器打开一次并刷新，再「添加到桌面」。
 
 - 华为学习平板的完整步骤（含学习模式管控、话筒权限、发音检查）：[`docs/deploy-huawei.md`](docs/deploy-huawei.md)
+- 放到阿里云或腾讯云轻量服务器、做 ICP 备案、用脚本或 GitHub Actions 发布：[`docs/DEPLOY_CN.md`](docs/DEPLOY_CN.md)
 - 网站本身会缓存到设备上（Service Worker），网络慢时也能秒开；动画在 B 站播放器里播放，仍然需要联网。
-- 字体已放在本地，不依赖国内访问不了的 Google Fonts。
+- 字体、样式和脚本都在本仓库里，页面不请求 Google Fonts、jsDelivr、unpkg、cdnjs 或统计脚本。
 - 浏览器只在 `https://` 或 `http://localhost` 下允许使用话筒和离线缓存，所以正式使用一定要配 HTTPS。
 
 **第一次在新设备上用：** 进「家长中心」：
@@ -63,6 +65,9 @@ assets/js/speech.js   朗读和录音
 assets/js/app.js      页面路由和各个学习活动
 docs/plan.md          网站搭建方案
 docs/deploy-huawei.md 部署到华为学习平板
+docs/DEPLOY_CN.md     部署到国内云服务器（备案、Nginx、自动发布）
+deploy/               Nginx 配置和 SSH/rsync 部署脚本
+.github/workflows/    用仓库 Secrets 发布到服务器的 GitHub Actions
 ```
 
 > 改动文件后：`sw.js` 会在后台自动取新版本；如果新增或删除了文件，记得同步修改 `sw.js` 里的 `SHELL` 列表并把 `VERSION` 加一。

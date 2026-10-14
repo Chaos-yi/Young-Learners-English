@@ -5,29 +5,29 @@
  * 策略：先用缓存里的版本立即显示，同时在后台联网取新版本；下次打开就是新版本。
  * 增删文件时更新 SHELL 列表并把 VERSION 加一。
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = 'little-ears-' + VERSION;
 const SHELL = [
   './',
-  'index.html',
-  'manifest.webmanifest',
-  'assets/css/style.css',
-  'assets/fonts/fonts.css',
-  'assets/fonts/andika-latin-400-normal.woff2',
-  'assets/fonts/andika-latin-700-normal.woff2',
-  'assets/fonts/grandstander-latin-700-normal.woff2',
-  'assets/fonts/grandstander-latin-800-normal.woff2',
-  'assets/fonts/nunito-latin-600-normal.woff2',
-  'assets/fonts/nunito-latin-700-normal.woff2',
-  'assets/fonts/nunito-latin-800-normal.woff2',
-  'assets/js/data.js',
-  'assets/js/store.js',
-  'assets/js/speech.js',
-  'assets/js/app.js',
-  'assets/icons/icon-192.png',
-  'assets/icons/icon-512.png',
-  'assets/icons/icon-maskable-512.png',
-  'assets/icons/apple-touch-icon.png'
+  './index.html',
+  './manifest.webmanifest',
+  './assets/css/style.css',
+  './assets/fonts/fonts.css',
+  './assets/fonts/andika-latin-400-normal.woff2',
+  './assets/fonts/andika-latin-700-normal.woff2',
+  './assets/fonts/grandstander-latin-700-normal.woff2',
+  './assets/fonts/grandstander-latin-800-normal.woff2',
+  './assets/fonts/nunito-latin-600-normal.woff2',
+  './assets/fonts/nunito-latin-700-normal.woff2',
+  './assets/fonts/nunito-latin-800-normal.woff2',
+  './assets/js/data.js',
+  './assets/js/store.js',
+  './assets/js/speech.js',
+  './assets/js/app.js',
+  './assets/icons/icon-192.png',
+  './assets/icons/icon-512.png',
+  './assets/icons/icon-maskable-512.png',
+  './assets/icons/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', event => {
@@ -45,7 +45,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  const key = req.mode === 'navigate' ? 'index.html' : req;
+  const key = req.mode === 'navigate' ? './index.html' : req;
   event.respondWith(caches.open(CACHE).then(async cache => {
     const cached = await cache.match(key, { ignoreSearch: true });
     const fresh = fetch(req).then(res => {

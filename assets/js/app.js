@@ -49,6 +49,7 @@
 
   // 页面切换时要清理的东西（录音、计时等）
   let cleanups = [];
+  let dismissGuide = () => {};
   function onCleanup(fn) { cleanups.push(fn); }
 
   // 看视频、循环听时孩子不一定点屏幕，这期间也要计时
@@ -543,12 +544,13 @@
   }
 
   function viewToday() {
+    view.classList.add('home-view');
     const s = S.settings;
     const d = S.day();
     const next = STEPS.find(st => !d.steps[st.id]);
     const started = Object.keys(d.steps).length > 0;
     const hour = new Date().getHours();
-    const greet = (hour < 11 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening') + ', ' + s.name + '!';
+    const greet = (hour < 11 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening') + (S.hasName() ? ', ' + s.name + '!' : '');
     const noVideos = !S.seriesList().some(x => S.episodes(x.id).length);
     const total = STEPS.reduce((n, st) => n + st.mins, 0);
     const now = new Date();
@@ -576,7 +578,7 @@
           <div class="stat"><b>${S.state.stickers.length}</b><span>贴纸</span></div>
         </div>
       </section>
-      <section class="grid">
+      <section class="grid home-route">
         <div class="section-head"><h2>今日路线</h2><p>做完一步打一个勾</p></div>
         <div class="route">${STEPS.map((st, i) => {
           const done = !!d.steps[st.id];
@@ -1024,7 +1026,100 @@
   let parentUnlocked = false;
   let parentTab = 'report';
 
-  function viewParent() {
+  // 首次使用准备按三步保存；跳过也会前进，不会每次打开都打扰家长。
+  function advanceGuide() {
+    dismissGuide();
+    S.advanceOnboarding();
+    if (S.onboarding.completed) {
+      if (location.hash === '#/' || !location.hash) route();
+      else location.hash = '#/';
+    } else route();
+  }
+  function goToGuidePage() {
+    dismissGuide();
+    const page = S.openOnboardingPage();
+    if (!page) return;
+    parentUnlocked = true;
+    const hash = '#/parent/' + page;
+    if (location.hash === hash) route();
+    else location.hash = hash;
+  }
+  function guideBanner() {
+    if (!S.needsOnboarding() || !S.onboarding.page) return;
+    const guide = S.onboarding;
+    const banner = document.createElement('section');
+    banner.className = 'card onboarding-banner';
+    banner.setAttribute('aria-label', '首次使用引导');
+    banner.innerHTML = `<p class="eyebrow">给家长 · 第 ${guide.step + 1} / 3 步</p><h2>${guide.step === 1 ? '添加一个动画，就可以开始了' : '试听一下英语发音'}</h2><p class="muted">${guide.step === 1 ? '展开一个系列，粘贴播放链接并保存。保存后点击下一步，也可以跳过。' : '在下方「英语发音」中点试听，确认声音清楚；需要时可到学习设置调整发音人。'}</p><div class="row"><button class="btn btn-soft" type="button" data-guide-next>${guide.step === 1 ? '动画已添加，下一步' : '试听后，完成引导'}</button><button class="btn btn-ghost" type="button" data-guide-skip>跳过这一步</button>${parentTab !== guide.page ? '<button class="btn btn-ghost" type="button" data-guide-back>回到这一步</button>' : ''}</div>`;
+    $('#parentBody').before(banner);
+    $('[data-guide-skip]', banner).onclick = advanceGuide;
+    $('[data-guide-next]', banner).onclick = () => {
+      if (guide.step === 1 && !S.hasVideos()) {
+        toast('先保存一个动画链接，也可以跳过这一步');
+        return;
+      }
+      advanceGuide();
+    };
+    if ($('[data-guide-back]', banner)) $('[data-guide-back]', banner).onclick = goToGuidePage;
+  }
+  function showGuide() {
+    if (!S.needsOnboarding()) return;
+    if (S.onboarding.page && /^#\/parent(?:\/|$)/.test(location.hash) && parentUnlocked) return;
+    dismissGuide();
+    S.startOnboarding();
+    const step = S.onboarding.step;
+    const titles = ['先填孩子的英文名', '给孩子准备一个动画', '试听一下英语发音'];
+    const notes = [
+      '名字可以之后再改，也可以先跳过。',
+      '去视频管理选一个系列，添加一个可播放的链接。',
+      '去设备检查点「试听」，确认这台设备能清楚地读英语。',
+    ];
+    layer.innerHTML = `<div class="overlay"><section class="card onboarding-dialog m-parent" role="dialog" aria-modal="true" aria-labelledby="guideTitle"><p class="eyebrow">给家长 · 第 ${step + 1} / 3 步</p><div class="guide-dots" aria-hidden="true">${[0, 1, 2].map((i) => `<span class="${i === step ? 'current' : i < step ? 'done' : ''}"></span>`).join('')}</div><span class="guide-art" aria-hidden="true">${['👋', '📺', '🔊'][step]}</span><h2 id="guideTitle">${titles[step]}</h2><p class="muted">${notes[step]}</p>${step === 0 ? `<form id="guideNameForm" class="form"><div class="field"><label for="guideName">孩子的英文名</label><input id="guideName" class="input" maxlength="20" autocomplete="off" placeholder="例如 Lily" value="${S.hasName() ? esc(S.settings.name) : ''}"></div><button class="btn" type="submit">保存，下一步</button></form>` : `<button class="btn" type="button" id="guideGo">去${step === 1 ? '视频管理' : '设备检查'}</button>`}<button class="btn btn-ghost" type="button" id="guideSkip">跳过这一步</button><p class="help">看完三步后会记下来，以后不再自动弹出。</p></section></div>`;
+    document.body.classList.add('guide-open');
+    const dialog = $('.onboarding-dialog', layer);
+    function keydown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        advanceGuide();
+      } else if (e.key === 'Tab') {
+        const elements = Array.from(dialog.querySelectorAll('input, button'));
+        const first = elements[0],
+          last = elements[elements.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener('keydown', keydown);
+    dismissGuide = () => {
+      document.removeEventListener('keydown', keydown);
+      document.body.classList.remove('guide-open');
+      if (dialog.isConnected) layer.innerHTML = '';
+      dismissGuide = () => {};
+    };
+    $('#guideSkip').onclick = advanceGuide;
+    if (step === 0)
+      $('#guideNameForm').onsubmit = (e) => {
+        e.preventDefault();
+        if (!$('#guideName').value.trim()) {
+          toast('可以填一个名字，或点「跳过这一步」');
+          $('#guideName').focus();
+          return;
+        }
+        S.setName($('#guideName').value);
+        advanceGuide();
+      };
+    else $('#guideGo').onclick = goToGuidePage;
+    // 手机上先聚焦按钮，避免自动弹出键盘遮住引导。
+    $(step === 0 ? '#guideNameForm button' : '#guideGo').focus();
+  }
+
+  function viewParent(requestedTab) {
+    if (requestedTab) parentTab = requestedTab;
     if (!parentUnlocked) { parentGate(); return; }
     const tab = (id, label) => `<button class="filter" type="button" data-t="${id}" aria-pressed="${parentTab === id}">${label}</button>`;
     view.innerHTML = `
@@ -1040,6 +1135,7 @@
     else if (parentTab === 'settings') parentSettings(body);
     else if (parentTab === 'device') parentDevice(body);
     else parentVideos(body);
+    guideBanner();
   }
 
   function parentGate() {
@@ -1228,7 +1324,7 @@
       <section class="card form">
         <div class="field">
           <label for="setName">孩子的英文名</label>
-          <input id="setName" class="input" value="${esc(s.name)}" maxlength="20" autocomplete="off">
+          <input id="setName" class="input" value="${S.hasName() ? esc(s.name) : ''}" placeholder="选填，例如 Lily" maxlength="20" autocomplete="off">
           <span class="help">会出现在句子里，比如 <span lang="en">“My name is ${esc(s.name)}.”</span></span>
         </div>
         <div class="field">
@@ -1268,7 +1364,7 @@
       </section>`;
 
     const changed = msg => { S.save(); toast(msg || '已保存'); };
-    $('#setName').onchange = e => { s.name = e.target.value.trim() || 'Tom'; changed(); };
+    $('#setName').onchange = e => { S.setName(e.target.value); changed(); };
     $('#setAge').onchange = e => { s.age = +e.target.value; changed(); };
     $$('.seg', body).forEach(g => {
       g.onclick = e => {
@@ -1511,10 +1607,11 @@
     [/^\/game\/move$/, viewMoveGame, 'listen'],
     [/^\/loop$/, viewLoop, 'listen'],
     [/^\/stickers$/, viewStickers, ''],
-    [/^\/parent$/, viewParent, '']
+    [/^\/parent(?:\/(videos|device|settings))?$/, viewParent, '']
   ];
 
   function route() {
+    dismissGuide();
     cleanups.forEach(fn => { try { fn(); } catch (e) { /* 忽略 */ } });
     cleanups = [];
     keepAlive = false;
@@ -1524,6 +1621,7 @@
     const t = $('#toast');
     if (t) t.hidden = true;
     const path = location.hash.replace(/^#/, '') || '/';
+    if (S.needsOnboarding() && S.onboarding.page && path === '/parent/' + S.onboarding.page) parentUnlocked = true;
     const hit = ROUTES.find(r => r[0].test(path));
     if (!hit) { location.hash = '#/'; return; }
     setTab(hit[2]);
@@ -1531,12 +1629,13 @@
     hit[1].apply(null, path.match(hit[0]).slice(1));
     window.scrollTo(0, 0);
     renderHeader();
+    showGuide();
   }
   window.addEventListener('hashchange', route);
   route();
 
   // 离线缓存：只在 https 或 localhost 下可用
   if ('serviceWorker' in navigator && window.isSecureContext && /^https?:$/.test(location.protocol)) {
-    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+    window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); });
   }
 })();

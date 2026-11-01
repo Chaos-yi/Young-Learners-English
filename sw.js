@@ -12,8 +12,8 @@ const SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './assets/css/style.css',
-  './assets/fonts/fonts.css',
+  './assets/css/style.css?v=5',
+  './assets/fonts/fonts.css?v=5',
   './assets/fonts/andika-latin-400-normal.woff2',
   './assets/fonts/andika-latin-700-normal.woff2',
   './assets/fonts/grandstander-latin-700-normal.woff2',
@@ -21,10 +21,10 @@ const SHELL = [
   './assets/fonts/nunito-latin-600-normal.woff2',
   './assets/fonts/nunito-latin-700-normal.woff2',
   './assets/fonts/nunito-latin-800-normal.woff2',
-  './assets/js/data.js',
-  './assets/js/store.js',
-  './assets/js/speech.js',
-  './assets/js/app.js',
+  './assets/js/data.js?v=5',
+  './assets/js/store.js?v=5',
+  './assets/js/speech.js?v=5',
+  './assets/js/app.js?v=5',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png',
   './assets/icons/icon-maskable-512.png',
@@ -32,7 +32,8 @@ const SHELL = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // 升级时必须重新验证资源，避免把 HTTP 缓存中的旧 JS/CSS 写进新缓存。
+  event.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(url => new Request(url, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
@@ -48,9 +49,10 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   const key = req.mode === 'navigate' ? './index.html' : req;
   event.respondWith(caches.open(CACHE).then(async cache => {
-    const cached = await cache.match(key, { ignoreSearch: true });
-    const fresh = fetch(req).then(res => {
-      if (res && res.ok) cache.put(key, res.clone());
+    // 导航已统一为 index.html；静态资源精确匹配查询参数，不能串用不同版本。
+    const cached = await cache.match(key);
+    const fresh = fetch(new Request(req, { cache: 'reload' })).then(async res => {
+      if (res && res.ok) await cache.put(key, res.clone());
       return res;
     }).catch(() => null);
     if (cached) {

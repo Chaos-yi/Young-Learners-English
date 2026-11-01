@@ -6,7 +6,7 @@
  * 增删文件时更新 SHELL 列表并把 VERSION 加一。
  * 只缓存本站文件。B 站播放器等跨域请求不拦截，避免把境外或第三方响应写进离线缓存。
  */
-const VERSION = 'v4';
+const VERSION = 'v5';
 const CACHE = 'little-ears-' + VERSION;
 const SHELL = [
   './',

@@ -1,0 +1,46 @@
+{
+  "app": "little-ears",
+  "version": 2,
+  "savedAt": "2026-10-31T12:00:00.000Z",
+  "data": {
+    "settings": {
+      "name": "Lily",
+      "nameConfigured": true,
+      "age": 8,
+      "dailyMinutes": 20,
+      "accent": "en-US",
+      "rate": 0.75,
+      "voiceURI": "saved-local-voice",
+      "showChinese": false,
+      "parentNote": "keep this extension"
+    },
+    "videos": {
+      "lists": {
+        "sss": {
+          "episodes": [
+            { "kind": "bili", "bvid": "BV1234567890", "page": 1 },
+            { "kind": "bili", "bvid": "BV1234567890", "page": 2 },
+            { "kind": "bili", "bvid": "BV1234567890", "page": 3 }
+          ],
+          "watched": [0, 2]
+        },
+        "custom-story": {
+          "episodes": [{ "kind": "file", "src": "https://example.com/story.mp4" }],
+          "watched": [0]
+        }
+      },
+      "custom": [{ "id": "custom-story", "title": "My Stories", "stage": 0, "q": "My Stories" }],
+      "current": "sss"
+    },
+    "lessons": { "l01": { "done": true, "n": 3 }, "l02": { "done": true, "n": 1 } },
+    "games": { "listen": 4, "move": 3 },
+    "days": {
+      "2026-10-30": { "secs": 955, "steps": { "video": true, "speak": true, "listen": true }, "done": true, "log": { "watched": 2, "lessons": 1, "games": 2 }, "reminded": true },
+      "2026-10-31": { "secs": 423, "steps": { "video": true }, "done": false, "log": { "watched": 1, "lessons": 1, "games": 1 } }
+    },
+    "stars": 17,
+    "stickers": ["🌟", "🐱"],
+    "onboarding": { "step": 2, "started": true, "completed": true, "page": "" },
+    "extraRecord": { "keep": [1, 2, "legacy"] }
+  }
+}

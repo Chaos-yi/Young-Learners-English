@@ -6,6 +6,8 @@
  */
 (function () {
   const KEY = 'little-ears.v2';
+  const MAX_PROFILES = 3;
+  const COLORS = ['sky', 'leaf', 'grape', 'sun', 'coral'];
 
   const DEFAULTS = {
     settings: {
@@ -53,24 +55,97 @@
     return s;
   }
 
+  function newId() {
+    return 'child-' + (window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+  }
+  function makeProfile(data, color) {
+    return { id: newId(), color: COLORS.includes(color) ? color : COLORS[0], data: normalize(data) };
+  }
+  function isRecord(value) { return !!value && typeof value === 'object' && !Array.isArray(value); }
+  function validFamily(saved) {
+    return isRecord(saved) && saved.schemaVersion === 3 && Array.isArray(saved.profiles) &&
+      saved.profiles.length >= 1 && saved.profiles.length <= MAX_PROFILES &&
+      saved.profiles.every(p => isRecord(p) && typeof p.id === 'string' && p.id.length > 0 && isRecord(p.data)) &&
+      new Set(saved.profiles.map(p => p.id)).size === saved.profiles.length &&
+      saved.profiles.some(p => p.id === saved.activeProfileId);
+  }
+  function normalizeFamily(saved) {
+    if (validFamily(saved)) {
+      return {
+        schemaVersion: 3,
+        activeProfileId: saved.activeProfileId,
+        profiles: saved.profiles.map(p => ({ id: p.id, color: COLORS.includes(p.color) ? p.color : COLORS[0], data: normalize(p.data) }))
+      };
+    }
+    // 旧的单孩子对象原样交给 normalize：包括视频、日志、设置和未识别的扩展字段。
+    const first = makeProfile(saved);
+    return { schemaVersion: 3, activeProfileId: first.id, profiles: [first] };
+  }
   function load() {
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
-    return normalize(saved);
+    return normalizeFamily(saved);
   }
 
-  let state = load();
+  let family = load();
+  function currentProfile() { return family.profiles.find(p => p.id === family.activeProfileId); }
+  let state = currentProfile().data;
   let saveTimer = null;
 
   function saveNow() {
     clearTimeout(saveTimer);
     saveTimer = null;
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 隐私模式等情况下不保存，页面照常可用 */ }
+    try { localStorage.setItem(KEY, JSON.stringify(family)); } catch (e) { /* 隐私模式等情况下不保存，页面照常可用 */ }
   }
   function save() {
     if (!saveTimer) saveTimer = setTimeout(saveNow, 300);
   }
   window.addEventListener('pagehide', saveNow);
+  // 启动即持久化迁移，不必等孩子再完成一次学习；继续使用原 key，避免留下过时的单孩子副本。
+  saveNow();
+
+  function profiles() {
+    return family.profiles.map(p => ({ id: p.id, name: p.data.settings.name, configured: p.data.settings.nameConfigured, color: p.color }));
+  }
+  function validName(value) {
+    return typeof value === 'string' && value.trim().length <= 20 && /^[A-Za-z]+(?:[ '-][A-Za-z]+)*$/.test(value.trim());
+  }
+  function addProfile(name, color) {
+    if (family.profiles.length >= MAX_PROFILES || !validName(name)) return false;
+    const p = makeProfile({ settings: { name: name.trim(), nameConfigured: true }, onboarding: { completed: true } }, color);
+    family.profiles.push(p);
+    saveNow();
+    return p.id;
+  }
+  function updateProfile(id, name, color) {
+    const p = family.profiles.find(p => p.id === id);
+    if (!p || !validName(name)) return false;
+    p.data.settings.name = name.trim();
+    p.data.settings.nameConfigured = true;
+    if (COLORS.includes(color)) p.color = color;
+    saveNow();
+    return true;
+  }
+  function switchProfile(id) {
+    const next = family.profiles.find(p => p.id === id);
+    if (!next) return false;
+    saveNow(); // 包括尚未写盘的学习秒数和防抖中的进度。
+    family.activeProfileId = id;
+    state = next.data;
+    saveNow();
+    return true;
+  }
+  function deleteProfile(id) {
+    if (family.profiles.length <= 1 || !family.profiles.some(p => p.id === id)) return false;
+    family.profiles = family.profiles.filter(p => p.id !== id);
+    if (family.activeProfileId === id) {
+      family.activeProfileId = family.profiles[0].id;
+      state = currentProfile().data;
+    }
+    saveNow();
+    return true;
+  }
 
   // 区分系统示例名与家长实际填写的名字（实际填写 Tom 也有效）。
   function hasName() { return state.settings.nameConfigured && !!state.settings.name.trim(); }
@@ -248,22 +323,27 @@
   }
 
   function reset() {
-    const onboarding = clone(state.onboarding);
-    state = clone(DEFAULTS);
-    state.onboarding = onboarding;
+    // 重置只影响当前孩子的学习内容，保留档案身份和学习设置。
+    state = normalize({ settings: clone(state.settings), onboarding: clone(state.onboarding) });
+    currentProfile().data = state;
     saveNow();
   }
 
   // 备份与恢复：换设备、换网址时把视频链接、进度和设置整个搬过去
   function exportData() {
     saveNow();
-    return JSON.stringify({ app: 'little-ears', version: 2, savedAt: new Date().toISOString(), data: state });
+    return JSON.stringify({ app: 'little-ears', version: 3, savedAt: new Date().toISOString(), data: family });
   }
   function importData(text) {
     let obj = null;
     try { obj = JSON.parse(String(text).trim()); } catch (e) { return false; }
-    if (!obj || obj.app !== 'little-ears' || !obj.data || typeof obj.data !== 'object') return false;
-    state = normalize(obj.data);
+    if (!obj || obj.app !== 'little-ears' || !isRecord(obj.data)) return false;
+    // 新格式必须完整合法；拒绝损坏/未来版本备份，不能用空档案覆盖现有家庭。
+    if (obj.version === 3) {
+      if (!validFamily(obj.data)) return false;
+    } else if (obj.version !== 2 || !isRecord(obj.data.settings) || 'profiles' in obj.data || 'schemaVersion' in obj.data) return false;
+    family = normalizeFamily(obj.data);
+    state = currentProfile().data;
     saveNow();
     document.dispatchEvent(new CustomEvent('le:stars'));
     return true;
@@ -273,6 +353,11 @@
     get state() { return state; },
     get settings() { return state.settings; },
     get onboarding() { return clone(state.onboarding); },
+    get profiles() { return profiles(); },
+    get activeProfileId() { return family.activeProfileId; },
+    get profileColors() { return COLORS.slice(); },
+    maxProfiles: MAX_PROFILES,
+    addProfile, updateProfile, switchProfile, deleteProfile,
     hasName, setName, hasVideos, needsOnboarding, startOnboarding, advanceOnboarding, openOnboardingPage,
     save, saveNow, today, addDays, day, addStars,
     lessonById, themeById,

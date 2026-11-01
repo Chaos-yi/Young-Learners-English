@@ -12,8 +12,8 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./assets/fonts/fonts.css">
-  <link rel="stylesheet" href="./assets/css/style.css">
+  <link rel="stylesheet" href="./assets/fonts/fonts.css?v=5">
+  <link rel="stylesheet" href="./assets/css/style.css?v=5">
 </head>
 <body>
   <header class="topbar">
@@ -27,6 +27,7 @@
         <span class="brand-name">小耳朵英语<small>Little Ears</small></span>
       </a>
       <div class="top-stats">
+        <button class="profile-trigger" id="profileSwitch" type="button" aria-haspopup="dialog" aria-controls="profileDialog" aria-label="切换孩子档案"></button>
         <span class="chip chip-timer" id="timer" title="今天的学习时间"></span>
         <a class="chip chip-stars" id="stars" href="#/stickers" title="我的星星和贴纸"></a>
         <a class="icon-btn" href="#/parent" aria-label="家长中心" title="家长中心" id="parentLink"></a>
@@ -74,10 +75,11 @@
   </nav>
 
   <div id="layer"></div>
+  <dialog id="profileDialog" class="card profile-dialog m-parent" aria-labelledby="profileTitle"></dialog>
 
-  <script src="./assets/js/data.js"></script>
-  <script src="./assets/js/store.js"></script>
-  <script src="./assets/js/speech.js"></script>
-  <script src="./assets/js/app.js"></script>
+  <script src="./assets/js/data.js?v=5"></script>
+  <script src="./assets/js/store.js?v=5"></script>
+  <script src="./assets/js/speech.js?v=5"></script>
+  <script src="./assets/js/app.js?v=5"></script>
 </body>
 </html>

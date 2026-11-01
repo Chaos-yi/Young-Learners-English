@@ -15,6 +15,7 @@
   const S = LE.store, SP = LE.speech, D = LE.DATA;
   const view = document.getElementById('view');
   const layer = document.getElementById('layer');
+  const profileDialog = document.getElementById('profileDialog');
   const NUM_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 
   // ================= 小工具 =================
@@ -145,6 +146,115 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.hidden = true; }, 2800);
   }
+
+  // 档案入口常驻顶栏；管理界面按需打开，不占用首页空间。
+  const COLOR_NAMES = { sky: '蓝色', leaf: '绿色', grape: '紫色', sun: '黄色', coral: '珊瑚色' };
+  function profileAvatar(p) {
+    return `<span class="profile-avatar profile-color-${p.color}" aria-hidden="true">${esc(p.configured ? p.name.slice(0, 1).toUpperCase() : '?')}</span>`;
+  }
+  function profileColorField(color) {
+    return `<fieldset class="profile-colors"><legend>档案颜色（选填）</legend>${S.profileColors.map(c => `<label class="profile-color-${c}"><input type="radio" name="profileColor" value="${c}" ${c === color ? 'checked' : ''}><span>${COLOR_NAMES[c]}</span></label>`).join('')}</fieldset>`;
+  }
+  function renderProfileTrigger() {
+    const p = S.profiles.find(p => p.id === S.activeProfileId);
+    const name = p.configured ? p.name : '创建档案';
+    const trigger = $('#profileSwitch');
+    trigger.innerHTML = `${profileAvatar(p)}<span class="profile-name" lang="en">${esc(name)}</span><span class="profile-chevron" aria-hidden="true">⌄</span>`;
+    trigger.setAttribute('aria-label', `${name}，切换孩子档案`);
+    trigger.title = `${name} · 切换孩子档案`;
+  }
+  function profileDialogHeading(title) {
+    return `<div class="section-head"><h2 id="profileTitle">${title}</h2><button class="icon-btn" type="button" data-profile-close aria-label="关闭档案窗口">✕</button></div>`;
+  }
+  function showProfiles() {
+    profileDialog.innerHTML = `${profileDialogHeading('今天谁来学？')}
+      <p class="muted">点头像或名字切换。每个孩子都有自己的进度、记录和设置。</p>
+      <div class="profile-list">${S.profiles.map(p => `<div class="profile-row ${p.id === S.activeProfileId ? 'is-current' : ''}">
+        <button class="profile-pick" type="button" data-profile-switch="${esc(p.id)}" aria-label="切换到 ${esc(p.name)}" aria-pressed="${p.id === S.activeProfileId}">
+          ${profileAvatar(p)}<span class="profile-details"><b lang="en">${esc(p.configured ? p.name : '第一个孩子')}</b><small>${p.id === S.activeProfileId ? '正在学习' : '点一下切换'}</small></span>
+        </button><button class="profile-edit" type="button" data-profile-edit="${esc(p.id)}" aria-label="编辑 ${esc(p.name)} 的档案">编辑</button></div>`).join('')}</div>
+      <button class="btn btn-soft" type="button" data-profile-add ${S.profiles.length >= S.maxProfiles ? 'disabled' : ''}>＋ 添加孩子档案</button>
+      <p class="help">${S.profiles.length} / ${S.maxProfiles} 个档案 · 仅保存在本机浏览器。可在家长中心备份全家档案。</p>`;
+  }
+  function editProfile(id) {
+    const p = S.profiles.find(p => p.id === id);
+    const adding = !p;
+    profileDialog.innerHTML = `${profileDialogHeading(adding ? '添加孩子档案' : '编辑孩子档案')}
+      <form id="profileForm" class="form">
+        <div class="field"><label for="profileName">孩子的英文名</label><input id="profileName" class="input" maxlength="20" required autocomplete="off" placeholder="例如 Lily" value="${p && p.configured ? esc(p.name) : ''}" aria-describedby="profileNameHelp"><span class="help" id="profileNameHelp">最多 20 个字符，可用英文字母、空格、连字符和英文单引号。</span></div>
+        ${profileColorField(p ? p.color : S.profileColors[S.profiles.length])}
+        <div class="row"><button class="btn" type="submit">${adding ? '创建并开始学习' : '保存档案'}</button><button class="btn btn-ghost" type="button" data-profile-back>返回</button></div>
+      </form>
+      ${adding ? '<p class="help">新孩子从零开始，视频链接也单独保存。</p>' : `<div class="field danger"><button class="btn btn-ghost" type="button" data-profile-delete="${esc(p.id)}" ${S.profiles.length <= 1 ? 'disabled' : ''}>删除这个孩子档案</button>${S.profiles.length <= 1 ? '<p class="help">请至少保留一个孩子档案。</p>' : ''}</div>`}`;
+    $('#profileForm').onsubmit = e => {
+      e.preventDefault();
+      const name = $('#profileName').value;
+      const color = $('input[name="profileColor"]:checked', profileDialog).value;
+      const result = adding ? S.addProfile(name, color) : S.updateProfile(id, name, color);
+      if (!result) { toast('请填写有效的英文名（最多 20 个字符），一个家庭最多 3 个档案'); $('#profileName').focus(); return; }
+      if (adding) switchChild(result);
+      else {
+        profileDialog.close();
+        route();
+        toast('档案已保存');
+      }
+    };
+    // 避免一打开就弹出手机键盘；输入框仍然可正常点按和 Tab 到达。
+    $('[data-profile-back]', profileDialog).focus();
+  }
+  function confirmDeleteProfile(id) {
+    const p = S.profiles.find(p => p.id === id);
+    if (!p || S.profiles.length <= 1) return;
+    profileDialog.innerHTML = `${profileDialogHeading('确认删除孩子档案？')}
+      <div class="profile-delete-summary">${profileAvatar(p)}<b lang="en">${esc(p.name)}</b></div>
+      <p>将删除 <b>${esc(p.name)}</b> 的全部学习进度、记录、视频链接和设置，无法撤销。其他孩子的档案会保留。</p>
+      <p class="help">需要留存时，请先到家长中心备份全家档案。</p>
+      <div class="row"><button class="btn btn-soft" type="button" data-profile-edit="${esc(id)}">取消，保留档案</button><button class="btn danger" type="button" data-profile-confirm-delete="${esc(id)}">确认删除 ${esc(p.name)}</button></div>`;
+    $('[data-profile-edit]', profileDialog).focus();
+  }
+  function switchChild(id) {
+    stopActivities();
+    if (!S.switchProfile(id)) return;
+    profileDialog.close();
+    parentUnlocked = false;
+    parentTab = 'report';
+    lastActive = Date.now();
+    ticks = 0;
+    history.replaceState(null, '', '#/');
+    route();
+    toast(`现在是 ${S.settings.name} 的学习时间`);
+  }
+  $('#profileSwitch').onclick = () => {
+    interrupt();
+    SP.stop();
+    const t = $('#toast');
+    if (t) t.hidden = true;
+    showProfiles();
+    profileDialog.showModal();
+  };
+  profileDialog.onclick = e => {
+    if (e.target === profileDialog) {
+      const r = profileDialog.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) profileDialog.close();
+    }
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    if (b.hasAttribute('data-profile-close')) profileDialog.close();
+    else if (b.hasAttribute('data-profile-back')) { showProfiles(); $('[data-profile-add]', profileDialog).focus(); }
+    else if (b.hasAttribute('data-profile-add')) editProfile();
+    else if (b.dataset.profileSwitch) switchChild(b.dataset.profileSwitch);
+    else if (b.dataset.profileEdit) editProfile(b.dataset.profileEdit);
+    else if (b.dataset.profileDelete) confirmDeleteProfile(b.dataset.profileDelete);
+    else if (b.dataset.profileConfirmDelete) {
+      stopActivities();
+      if (!S.deleteProfile(b.dataset.profileConfirmDelete)) return;
+      profileDialog.close();
+      parentUnlocked = false;
+      history.replaceState(null, '', '#/');
+      route();
+      toast('孩子档案已删除');
+    }
+  };
 
   // 点任意英文单词 → 发音；带 data-say 的元素 → 读出内容
   document.addEventListener('click', e => {
@@ -559,7 +669,7 @@
 
     view.innerHTML = `
       ${!SP.supported ? '<div class="notice">当前浏览器不支持英语朗读。请用平板自带的浏览器，或电脑上的 Chrome / Edge 打开。</div>' : ''}
-      ${noVideos ? '<div class="notice"><span>家长请先到 <a href="#/parent">家长中心</a>：在「学习设置」填孩子的英文名，在「视频管理」添加要看的动画。</span></div>' : ''}
+      ${noVideos ? '<div class="notice"><span>点顶部头像可创建或切换孩子档案。家长请到 <a href="#/parent">家长中心 → 视频管理</a>，为当前孩子添加动画。</span></div>' : ''}
       <section class="card hero m-today">
         <div>
           <p class="eyebrow">${dateLabel}</p>
@@ -1068,13 +1178,13 @@
     dismissGuide();
     S.startOnboarding();
     const step = S.onboarding.step;
-    const titles = ['先填孩子的英文名', '给孩子准备一个动画', '试听一下英语发音'];
+    const titles = ['创建第一个孩子档案', '给孩子准备一个动画', '试听一下英语发音'];
     const notes = [
-      '名字可以之后再改，也可以先跳过。',
+      '先填英文名、选一个颜色。以后点顶部头像，可添加或切换孩子，一个家庭最多 3 个档案。',
       '去视频管理选一个系列，添加一个可播放的链接。',
       '去设备检查点「试听」，确认这台设备能清楚地读英语。',
     ];
-    layer.innerHTML = `<div class="overlay"><section class="card onboarding-dialog m-parent" role="dialog" aria-modal="true" aria-labelledby="guideTitle"><p class="eyebrow">给家长 · 第 ${step + 1} / 3 步</p><div class="guide-dots" aria-hidden="true">${[0, 1, 2].map((i) => `<span class="${i === step ? 'current' : i < step ? 'done' : ''}"></span>`).join('')}</div><span class="guide-art" aria-hidden="true">${['👋', '📺', '🔊'][step]}</span><h2 id="guideTitle">${titles[step]}</h2><p class="muted">${notes[step]}</p>${step === 0 ? `<form id="guideNameForm" class="form"><div class="field"><label for="guideName">孩子的英文名</label><input id="guideName" class="input" maxlength="20" autocomplete="off" placeholder="例如 Lily" value="${S.hasName() ? esc(S.settings.name) : ''}"></div><button class="btn" type="submit">保存，下一步</button></form>` : `<button class="btn" type="button" id="guideGo">去${step === 1 ? '视频管理' : '设备检查'}</button>`}<button class="btn btn-ghost" type="button" id="guideSkip">跳过这一步</button><p class="help">看完三步后会记下来，以后不再自动弹出。</p></section></div>`;
+    layer.innerHTML = `<div class="overlay"><section class="card onboarding-dialog m-parent" role="dialog" aria-modal="true" aria-labelledby="guideTitle"><p class="eyebrow">给家长 · 第 ${step + 1} / 3 步</p><div class="guide-dots" aria-hidden="true">${[0, 1, 2].map((i) => `<span class="${i === step ? 'current' : i < step ? 'done' : ''}"></span>`).join('')}</div><span class="guide-art" aria-hidden="true">${['👋', '📺', '🔊'][step]}</span><h2 id="guideTitle">${titles[step]}</h2><p class="muted">${notes[step]}</p>${step === 0 ? `<form id="guideNameForm" class="form"><div class="field"><label for="guideName">孩子的英文名</label><input id="guideName" class="input" maxlength="20" required autocomplete="off" placeholder="例如 Lily" value="${S.hasName() ? esc(S.settings.name) : ''}"></div>${profileColorField(S.profiles.find(p => p.id === S.activeProfileId).color)}<button class="btn" type="submit">创建档案，下一步</button></form>` : `<button class="btn" type="button" id="guideGo">去${step === 1 ? '视频管理' : '设备检查'}</button>`}<button class="btn btn-ghost" type="button" id="guideSkip">跳过这一步</button><p class="help">看完三步后会记下来，以后不再自动弹出。</p></section></div>`;
     document.body.classList.add('guide-open');
     const dialog = $('.onboarding-dialog', layer);
     function keydown(e) {
@@ -1082,7 +1192,7 @@
         e.preventDefault();
         advanceGuide();
       } else if (e.key === 'Tab') {
-        const elements = Array.from(dialog.querySelectorAll('input, button'));
+        const elements = Array.from(dialog.querySelectorAll('input:not([type="radio"]), input[type="radio"]:checked, button'));
         const first = elements[0],
           last = elements[elements.length - 1];
         if (e.shiftKey && document.activeElement === first) {
@@ -1105,12 +1215,11 @@
     if (step === 0)
       $('#guideNameForm').onsubmit = (e) => {
         e.preventDefault();
-        if (!$('#guideName').value.trim()) {
-          toast('可以填一个名字，或点「跳过这一步」');
+        if (!S.updateProfile(S.activeProfileId, $('#guideName').value, $('input[name="profileColor"]:checked', dialog).value)) {
+          toast('请填写有效的英文名，最多 20 个字符');
           $('#guideName').focus();
           return;
         }
-        S.setName($('#guideName').value);
         advanceGuide();
       };
     else $('#guideGo').onclick = goToGuidePage;
@@ -1124,12 +1233,14 @@
     const tab = (id, label) => `<button class="filter" type="button" data-t="${id}" aria-pressed="${parentTab === id}">${label}</button>`;
     view.innerHTML = `
       <div class="page-title"><h1>家长中心</h1><span class="sub">孩子的学习情况和设置</span></div>
+      <div class="row"><span class="muted">当前孩子：<b lang="en">${esc(S.settings.name)}</b></span><button class="profile-edit" type="button" id="manageProfiles">管理孩子档案</button></div>
       <div class="parent-tabs filters">${tab('report', '学习报告')}${tab('videos', '视频管理')}${tab('settings', '学习设置')}${tab('device', '设备检查')}</div>
       <div id="parentBody" class="grid"></div>`;
     $('.parent-tabs', view).onclick = e => {
       const b = e.target.closest('[data-t]');
       if (b) { parentTab = b.dataset.t; viewParent(); }
     };
+    $('#manageProfiles').onclick = () => $('#profileSwitch').click();
     const body = $('#parentBody');
     if (parentTab === 'report') parentReport(body);
     else if (parentTab === 'settings') parentSettings(body);
@@ -1322,11 +1433,7 @@
     const voices = SP.voices.filter(v => v.lang.replace('_', '-').toLowerCase().indexOf(s.accent.toLowerCase().slice(0, 5)) === 0);
     body.innerHTML = `
       <section class="card form">
-        <div class="field">
-          <label for="setName">孩子的英文名</label>
-          <input id="setName" class="input" value="${S.hasName() ? esc(s.name) : ''}" placeholder="选填，例如 Lily" maxlength="20" autocomplete="off">
-          <span class="help">会出现在句子里，比如 <span lang="en">“My name is ${esc(s.name)}.”</span></span>
-        </div>
+        <p class="muted">以下设置只属于 <b lang="en">${esc(s.name)}</b>。改名或更换颜色请点上方「管理孩子档案」。</p>
         <div class="field">
           <label for="setAge">年龄</label>
           <select id="setAge" class="input">${[5, 6, 7, 8, 9].map(a => `<option value="${a}" ${s.age === a ? 'selected' : ''}>${a} 岁（${NUM_WORDS[a]}）</option>`).join('')}</select>
@@ -1352,19 +1459,21 @@
           <span class="help">「跟我说」里每句下面的中文意思；孩子熟悉后可以关掉</span></div>
         <div class="field">
           <span class="label">备份与恢复</span>
-          <span class="help">换设备、换网址时用。在原来的设备上点「复制备份」，通过微信「文件传输助手」等发到新设备；在新设备上把内容粘贴到下面，点「恢复」。备份里有视频链接、学习进度和设置。</span>
-          <div><button class="btn btn-soft" type="button" id="copyBackup">复制备份</button></div>
+          <span class="help">备份包含全家所有孩子的档案、视频链接、学习进度和设置，以及当前选择的孩子。可复制文字或下载文件，在新设备粘贴或选择文件后点「恢复」。旧版单孩子备份也可恢复为第一个档案。恢复会替换本机全部档案，请先备份。</span>
+          <div class="row"><button class="btn btn-soft" type="button" id="copyBackup">复制备份</button><button class="btn btn-soft" type="button" id="downloadBackup">下载备份文件</button></div>
+          <label for="backupFile">选择备份文件（新旧格式均可）</label>
+          <input id="backupFile" type="file" accept=".json,application/json">
           <textarea id="backupText" class="input" rows="3" placeholder="把备份内容粘贴到这里" aria-label="备份内容"></textarea>
           <div><button class="btn" type="button" id="restoreBackup">恢复</button></div>
         </div>
         <div class="field danger">
           <span class="label">重置</span>
-          <div><button class="btn btn-ghost" type="button" id="resetAll">${icon('trash')} 清空所有学习记录和视频</button></div>
+          <p class="help">只清空 ${esc(s.name)} 的学习记录和视频，保留档案和设置；其他孩子不受影响。</p>
+          <div><button class="btn btn-ghost" type="button" id="resetAll">${icon('trash')} 清空当前孩子的记录和视频</button></div>
         </div>
       </section>`;
 
     const changed = msg => { S.save(); toast(msg || '已保存'); };
-    $('#setName').onchange = e => { S.setName(e.target.value); changed(); };
     $('#setAge').onchange = e => { s.age = +e.target.value; changed(); };
     $$('.seg', body).forEach(g => {
       g.onclick = e => {
@@ -1391,39 +1500,66 @@
         manual();
       }
     };
+    $('#downloadBackup').onclick = () => {
+      const url = URL.createObjectURL(new Blob([S.exportData()], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `little-ears-family-${S.today()}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
     let restoreArmed = false;
-    $('#restoreBackup').onclick = e => {
-      const text = $('#backupText').value.trim();
+    let armedText = '';
+    let restoreTimer = null;
+    const backupBox = $('#backupText');
+    const restoreButton = $('#restoreBackup');
+    const disarmRestore = () => {
+      clearTimeout(restoreTimer);
+      restoreArmed = false;
+      restoreButton.textContent = '恢复';
+    };
+    backupBox.oninput = disarmRestore;
+    $('#backupFile').onchange = async e => {
+      const input = e.target;
+      const file = input.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        if (!backupBox.isConnected || input.files[0] !== file) return;
+        backupBox.value = text;
+        disarmRestore();
+        toast('备份文件已读入，点恢复并再次确认后生效');
+      } catch (err) { toast('无法读取备份文件，请重试'); }
+    };
+    restoreButton.onclick = e => {
+      const text = backupBox.value.trim();
       if (!text) { toast('请先把备份内容粘贴到上面的输入框'); return; }
-      if (!restoreArmed) {
+      if (!restoreArmed || armedText !== text) {
         restoreArmed = true;
-        e.currentTarget.textContent = '再点一次确认（会覆盖这台设备上的记录）';
-        setTimeout(() => {
-          restoreArmed = false;
-          const b = $('#restoreBackup');
-          if (b) b.textContent = '恢复';
-        }, 5000);
+        armedText = text;
+        e.currentTarget.textContent = '再点一次确认（替换本机全部孩子档案）';
+        clearTimeout(restoreTimer);
+        restoreTimer = setTimeout(disarmRestore, 5000);
         return;
       }
-      restoreArmed = false;
+      disarmRestore();
       if (!S.importData(text)) {
         e.currentTarget.textContent = '恢复';
         toast('没认出这段备份，请确认复制完整了');
         return;
       }
-      renderHeader();
-      toast('已恢复：视频链接、学习进度和设置都搬过来了');
-      parentSettings(body);
+      route();
+      toast('已恢复全部孩子档案、视频链接、学习进度和设置');
     };
     let armed = false;
-    $('#resetAll').onclick = e => {
+    const resetButton = $('#resetAll');
+    resetButton.onclick = e => {
       if (!armed) {
         armed = true;
         e.currentTarget.innerHTML = `${icon('trash')} 再点一次，确认清空`;
         setTimeout(() => {
           armed = false;
-          const b = $('#resetAll');
-          if (b) b.innerHTML = `${icon('trash')} 清空所有学习记录和视频`;
+          resetButton.innerHTML = `${icon('trash')} 清空当前孩子的记录和视频`;
         }, 4000);
         return;
       }
@@ -1571,7 +1707,7 @@
   function renderStars() {
     $('#stars').innerHTML = `${icon('star')}<span class="n">${S.state.stars}</span>`;
   }
-  function renderHeader() { renderTimer(); renderStars(); }
+  function renderHeader() { renderTimer(); renderStars(); renderProfileTrigger(); }
   document.addEventListener('le:stars', renderStars);
 
   // 学习计时：页面可见、且 2 分钟内有操作（或正在看视频、循环听）才计时
@@ -1580,6 +1716,7 @@
   ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { lastActive = Date.now(); }, { passive: true }));
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
+    if (profileDialog.open || document.body.classList.contains('guide-open')) return;
     if (!keepAlive && Date.now() - lastActive > 120000) return;
     S.addSeconds(1);
     ticks += 1;
@@ -1610,13 +1747,17 @@
     [/^\/parent(?:\/(videos|device|settings))?$/, viewParent, '']
   ];
 
-  function route() {
-    dismissGuide();
+  function stopActivities() {
     cleanups.forEach(fn => { try { fn(); } catch (e) { /* 忽略 */ } });
     cleanups = [];
     keepAlive = false;
     interrupt();
     SP.stop();
+  }
+  function route() {
+    dismissGuide();
+    if (profileDialog.open) profileDialog.close();
+    stopActivities();
     layer.innerHTML = '';
     const t = $('#toast');
     if (t) t.hidden = true;

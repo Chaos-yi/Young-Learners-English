@@ -38,17 +38,14 @@
 
   <footer class="site-footer">
     <!--
-      ICP / 公安备案号占位。上线前只改下面两处文字，ICP 的 href 保持不动：
-      - 把「京ICP备XXXXXXXX号」换成真实编号，例如 京ICP备12345678号-1。
-        href 必须保持 https://beian.miit.gov.cn/
-      - 把「京公网安备XXXXXXXXXXXXX号」换成真实编号，例如 京公网安备11010502012345号。
-        编号里的连续数字会自动接到 https://www.beian.gov.cn/ 的查询链接上。
-      文字里还连续出现 X 时，链接先隐藏，避免备案审核时页面上出现假编号。
+      ICP 备案已通过，链接保持 https://beian.miit.gov.cn/。
+      公安备案审核中：「京公网安备XXXXXXXXXXXXX号」占位保持隐藏。
+      号码下发后替换公安备案文字，编号里的数字会自动接到公安备案查询链接上。
       步骤见 docs/DEPLOY_CN.md。
     -->
     <p class="beian-row">
-      <a id="beian-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">京ICP备XXXXXXXX号</a>
-      <a id="beian-mps" href="https://www.beian.gov.cn/" target="_blank" rel="noopener noreferrer">京公网安备XXXXXXXXXXXXX号</a>
+      <a id="beian-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">沪ICP备2026035258号-2</a>
+      <a id="beian-mps" href="https://www.beian.gov.cn/" target="_blank" rel="noopener noreferrer" hidden>京公网安备XXXXXXXXXXXXX号</a>
     </p>
   </footer>
   <script>
@@ -63,7 +60,6 @@
       el.hidden = false;
       return true;
     }
-    ready(document.getElementById("beian-icp"));
     var mps = document.getElementById("beian-mps");
     if (!ready(mps)) return;
     var digits = (mps.textContent || "").replace(/\D/g, "");

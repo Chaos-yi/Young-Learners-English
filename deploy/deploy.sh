@@ -41,9 +41,19 @@ if [[ ! "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
 fi
 
 DEST="${DEPLOY_PATH%/}"
+case "${DEST}/" in
+  *//*|*/./*|*/../*)
+    echo "DEPLOY_PATH 不能包含重复斜杠或 .、.. 路径段。" >&2
+    exit 1
+    ;;
+esac
 case "$DEST" in
   /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/run|/sbin|/sys|/tmp|/usr|/var|/var/www)
     echo "DEPLOY_PATH 过于宽泛（$DEST）。请使用只放这个网站的目录，例如 /var/www/little-ears。" >&2
+    exit 1
+    ;;
+  /etc/*|/var/lib/letsencrypt|/var/lib/letsencrypt/*|/var/log/letsencrypt|/var/log/letsencrypt/*)
+    echo "DEPLOY_PATH 不能指向系统配置或 certbot 目录。" >&2
     exit 1
     ;;
 esac
@@ -92,12 +102,16 @@ ssh -i "$KEY_FILE" -p "$DEPLOY_PORT" \
   "${DEPLOY_USER}@${DEPLOY_HOST}" "mkdir -p ${DEST}"
 
 echo "同步文件……"
-rsync -az --delete --human-readable --chmod=D755,F644 \
-  --exclude '.git/' \
-  --exclude '.github/' \
-  --exclude 'deploy/' \
-  --exclude 'docs/' \
-  --exclude 'README.md' \
+# 只发布站点入口和 assets；其余文件既不上传，也不参与 --delete。
+# 显式保护 ACME 校验目录，证书和 Nginx 配置始终由服务器单独管理。
+rsync -az --delete --human-readable --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
+  --filter 'P /.well-known/***' \
+  --exclude '/.well-known/' \
+  --include '/index.html' \
+  --include '/sw.js' \
+  --include '/manifest.webmanifest' \
+  --include '/assets/***' \
+  --exclude '*' \
   -e "$RSYNC_RSH" \
   "${ROOT}/" "${DEPLOY_USER}@${DEPLOY_HOST}:${DEST}/"
 

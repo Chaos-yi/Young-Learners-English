@@ -10,6 +10,7 @@
   const DEFAULTS = {
     settings: {
       name: 'Tom',
+      nameConfigured: false,
       age: 6,
       dailyMinutes: 15,
       accent: 'en-GB',
@@ -23,7 +24,8 @@
     games: { listen: 0, move: 0 },
     days: {},               // days['YYYY-MM-DD'] = { secs, steps: {}, done, log: { watched, lessons, games } }
     stars: 0,
-    stickers: []
+    stickers: [],
+    onboarding: { step: 0, started: false, completed: false, page: '' }
   };
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -37,6 +39,17 @@
       s.videos = Object.assign(clone(DEFAULTS.videos), saved.videos || {});
       s.games = Object.assign(clone(DEFAULTS.games), saved.games || {});
     }
+    const name = typeof s.settings.name === 'string' ? s.settings.name.trim().slice(0, 20) : '';
+    s.settings.name = name || 'Tom';
+    if (!saved || !saved.settings || typeof saved.settings.nameConfigured !== 'boolean')
+      s.settings.nameConfigured = !!name && name !== 'Tom';
+    const guide = saved && saved.onboarding || {};
+    s.onboarding = {
+      step: Number.isInteger(guide.step) && guide.step >= 0 && guide.step <= 2 ? guide.step : 0,
+      started: guide.started === true,
+      completed: guide.completed === true,
+      page: (guide.step === 1 && guide.page === 'videos') || (guide.step === 2 && guide.page === 'device') ? guide.page : ''
+    };
     return s;
   }
 
@@ -58,6 +71,34 @@
     if (!saveTimer) saveTimer = setTimeout(saveNow, 300);
   }
   window.addEventListener('pagehide', saveNow);
+
+  // 区分系统示例名与家长实际填写的名字（实际填写 Tom 也有效）。
+  function hasName() { return state.settings.nameConfigured && !!state.settings.name.trim(); }
+  function setName(value) {
+    const name = String(value).trim().slice(0, 20);
+    state.settings.name = name || 'Tom';
+    state.settings.nameConfigured = !!name;
+    saveNow();
+  }
+  function hasVideos() {
+    return Object.values(state.videos.lists).some(l => l && Array.isArray(l.episodes) && l.episodes.length);
+  }
+  function needsOnboarding() {
+    return !state.onboarding.completed && (state.onboarding.started || (!hasName() && !hasVideos()));
+  }
+  function startOnboarding() { state.onboarding.started = true; saveNow(); }
+  function advanceOnboarding() {
+    state.onboarding.started = true;
+    state.onboarding.page = '';
+    if (state.onboarding.step < 2) state.onboarding.step += 1;
+    else state.onboarding.completed = true;
+    saveNow();
+  }
+  function openOnboardingPage() {
+    state.onboarding.page = state.onboarding.step === 1 ? 'videos' : state.onboarding.step === 2 ? 'device' : '';
+    saveNow();
+    return state.onboarding.page;
+  }
 
   // ---------- 日期 ----------
   function dateKey(d) {
@@ -207,7 +248,9 @@
   }
 
   function reset() {
+    const onboarding = clone(state.onboarding);
     state = clone(DEFAULTS);
+    state.onboarding = onboarding;
     saveNow();
   }
 
@@ -229,6 +272,8 @@
   LE.store = {
     get state() { return state; },
     get settings() { return state.settings; },
+    get onboarding() { return clone(state.onboarding); },
+    hasName, setName, hasVideos, needsOnboarding, startOnboarding, advanceOnboarding, openOnboardingPage,
     save, saveNow, today, addDays, day, addStars,
     lessonById, themeById,
     seriesList, seriesById, episodes, watched, setEpisodes, markWatched, nextEpisode, currentSeries, setCurrent, addCustom, removeCustom,

@@ -36,6 +36,39 @@
 
   <main id="view" aria-live="polite"></main>
 
+  <footer class="site-footer">
+    <!--
+      ICP 备案已通过，链接保持 https://beian.miit.gov.cn/。
+      公安备案审核中：「京公网安备XXXXXXXXXXXXX号」占位保持隐藏。
+      号码下发后替换公安备案文字，编号里的数字会自动接到公安备案查询链接上。
+      步骤见 docs/DEPLOY_CN.md。
+    -->
+    <p class="beian-row">
+      <a id="beian-icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">沪ICP备2026035258号-2</a>
+      <a id="beian-mps" href="https://www.beian.gov.cn/" target="_blank" rel="noopener noreferrer" hidden>京公网安备XXXXXXXXXXXXX号</a>
+    </p>
+  </footer>
+  <script>
+  (function () {
+    function ready(el) {
+      if (!el) return false;
+      var text = (el.textContent || "").replace(/\s+/g, "");
+      if (!text || /X{4,}/.test(text)) {
+        el.hidden = true;
+        return false;
+      }
+      el.hidden = false;
+      return true;
+    }
+    var mps = document.getElementById("beian-mps");
+    if (!ready(mps)) return;
+    var digits = (mps.textContent || "").replace(/\D/g, "");
+    if (digits.length >= 6) {
+      mps.href = "https://www.beian.gov.cn/portal/registerSystemInfo?recordcode=" + digits;
+    }
+  })();
+  </script>
+
   <nav class="tabbar" aria-label="主导航">
     <div class="tabbar-in" id="tabs"></div>
   </nav>

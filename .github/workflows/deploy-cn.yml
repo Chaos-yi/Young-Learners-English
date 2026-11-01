@@ -1,0 +1,59 @@
+# 用仓库 Secrets 把静态站点 rsync 到国内服务器。
+# 不会在日志里打印私钥。未配置 Secrets 时，普通 push 跳过；手动运行则失败并列出缺哪一项。
+#
+# 必填 Secrets：DEPLOY_HOST、DEPLOY_USER、DEPLOY_SSH_KEY、DEPLOY_PATH
+# 可选 Secrets：DEPLOY_PORT（默认 22）、DEPLOY_KNOWN_HOSTS（不填则部署时 ssh-keyscan）
+# 说明见 docs/DEPLOY_CN.md
+# 只同步站点文件；脚本保护 .well-known，不发布 Nginx 配置，也不操作 certbot。
+
+name: Deploy to mainland server
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/epic-gates-w5p8og
+
+concurrency:
+  group: deploy-cn
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Rsync over SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_PATH; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "缺少 GitHub Actions secret：$name"
+              missing=1
+            fi
+          done
+          if [[ "$missing" -eq 1 ]]; then
+            echo "请在仓库 Settings → Secrets and variables → Actions 中添加。名字和含义见 docs/DEPLOY_CN.md。"
+            if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+              exit 1
+            fi
+            echo "这次是 push 触发，且 secrets 还没配好，跳过部署。"
+            exit 0
+          fi
+          bash deploy/deploy.sh

@@ -4,8 +4,9 @@
  * 第一次联网打开时把整个网站存到平板上，之后断网或网络慢也能秒开。
  * 策略：先用缓存里的版本立即显示，同时在后台联网取新版本；下次打开就是新版本。
  * 增删文件时更新 SHELL 列表并把 VERSION 加一。
+ * 只缓存本站文件。B 站播放器等跨域请求不拦截，避免把境外或第三方响应写进离线缓存。
  */
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = 'little-ears-' + VERSION;
 const SHELL = [
   './',
